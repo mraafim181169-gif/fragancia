@@ -1,0 +1,8 @@
+{
+  "name": "Fragancia",
+  "description": "A premium, minimalist management platform for seamless coordination of cultural fests, competitions, and diverse event programming.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,145 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getRegistrationsFromDb,
+  createRegistrationInDb,
+  updateRegistrationCodeLetterInDb,
+  updateRegistrationStatusInDb,
+  deleteRegistrationInDb,
+  createAuditLogInDb,
+} from '@/lib/dbQueries';
+import { isDbConfigured } from '@/lib/db';
+import { store } from '@/lib/store';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const competitionId = searchParams.get('competitionId') || undefined;
+    const studentId = searchParams.get('studentId') || undefined;
+
+    if (isDbConfigured()) {
+      const registrations = await getRegistrationsFromDb({ competitionId, studentId });
+      return NextResponse.json({
+        success: true,
+        source: 'mysql',
+        total: registrations.length,
+        data: registrations,
+      });
+    }
+
+    let registrations = store.getRegistrations();
+    if (competitionId) registrations = registrations.filter((r) => r.competitionId === competitionId);
+    if (studentId) registrations = registrations.filter((r) => r.studentId === studentId);
+
+    return NextResponse.json({
+      success: true,
+      source: 'fallback',
+      total: registrations.length,
+      data: registrations,
+    });
+  } catch (error: any) {
+    console.error('[API /api/registrations GET Error]', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { competitionId, studentId, codeLetter, status, bypassPortal } = body;
+
+    if (!competitionId || !studentId) {
+      return NextResponse.json(
+        { success: false, error: 'competitionId and studentId are required' },
+        { status: 400 }
+      );
+    }
+
+    const regId = body.id || `reg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const regRecord = {
+      id: regId,
+      competitionId,
+      competitionName: body.competitionName || '',
+      studentId,
+      studentName: body.studentName || '',
+      chestNumber: body.chestNumber || '',
+      codeLetter: (codeLetter || '').trim().toUpperCase(),
+      teamId: body.teamId || '',
+      teamName: body.teamName || '',
+      categoryId: body.categoryId || '',
+      status: status || 'Registered',
+      registeredAt: new Date().toISOString(),
+    };
+
+    if (isDbConfigured()) {
+      await createRegistrationInDb(regRecord as any);
+      await createAuditLogInDb({
+        id: `log-${Date.now()}`,
+        action: 'STUDENT_REGISTERED',
+        details: `Registered participant for competition ${competitionId} (Code: ${regRecord.codeLetter}) in MySQL`,
+      });
+      return NextResponse.json({ success: true, id: regId, data: regRecord }, { status: 201 });
+    }
+
+    const result = store.registerStudent(competitionId, studentId, bypassPortal, codeLetter);
+    return NextResponse.json(result, { status: result.success ? 201 : 400 });
+  } catch (error: any) {
+    console.error('[API /api/registrations POST Error]', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, codeLetter, status } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Registration ID is required' }, { status: 400 });
+    }
+
+    if (isDbConfigured()) {
+      if (codeLetter !== undefined) {
+        await updateRegistrationCodeLetterInDb(id, codeLetter);
+      }
+      if (status !== undefined) {
+        await updateRegistrationStatusInDb(id, status);
+      }
+      return NextResponse.json({ success: true, message: 'Registration updated in MySQL' });
+    }
+
+    if (codeLetter !== undefined) {
+      store.updateRegistrationCodeLetter(id, codeLetter);
+    }
+    if (status !== undefined) {
+      store.updateRegistrationStatus(id, status);
+    }
+    return NextResponse.json({ success: true, message: 'Registration updated' });
+  } catch (error: any) {
+    console.error('[API /api/registrations PUT Error]', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Registration ID is required' }, { status: 400 });
+    }
+
+    if (isDbConfigured()) {
+      await deleteRegistrationInDb(id);
+      return NextResponse.json({ success: true, message: 'Registration removed from MySQL' });
+    }
+
+    store.deleteRegistration(id);
+    return NextResponse.json({ success: true, message: 'Registration deleted' });
+  } catch (error: any) {
+    console.error('[API /api/registrations DELETE Error]', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
