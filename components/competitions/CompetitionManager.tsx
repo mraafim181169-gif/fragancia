@@ -142,6 +142,7 @@ export function CompetitionManager({
 
   const handleSaveCompetition = (e: React.FormEvent) => {
     e.preventDefault();
+    if (session.role !== 'ADMIN') return;
     if (!formData.name.trim()) return;
 
     const cat = categories.find((c) => c.id === formData.categoryId);
@@ -184,10 +185,12 @@ export function CompetitionManager({
   };
 
   const handleStatusChange = (comp: Competition, nextStatus: CompetitionStatus) => {
+    if (session.role !== 'ADMIN') return;
     store.updateCompetition(comp.id, { status: nextStatus });
   };
 
   const handleDeleteComp = (comp: Competition) => {
+    if (session.role !== 'ADMIN') return;
     if (window.confirm(`Are you sure you want to delete "${comp.name}"?`)) {
       store.deleteCompetition(comp.id);
       if (viewingComp?.id === comp.id) setViewingComp(null);
@@ -512,7 +515,7 @@ export function CompetitionManager({
                   )}
 
                   {/* Judge Panel CTA */}
-                  {onNavigateToJudging && (
+                  {onNavigateToJudging && session.role !== 'VIEWER' && (
                     <button
                       onClick={() => onNavigateToJudging(comp)}
                       title="Open Blind Judging Panel"

@@ -26,6 +26,8 @@ interface DashboardHeroProps {
 
 export function DashboardHero({ onNavigate, onOpenAddStudent }: DashboardHeroProps) {
   const store = useFestStore();
+  const session = store.getSession();
+  const isAdmin = session.role === 'ADMIN';
   const settings = store.getSettings();
   const students = store.getStudents();
   const competitions = store.getCompetitions();
@@ -94,7 +96,7 @@ export function DashboardHero({ onNavigate, onOpenAddStudent }: DashboardHeroPro
                 <ArrowUpRight className="w-4 h-4 opacity-70" />
               </button>
 
-              {onOpenAddStudent && (
+              {isAdmin && onOpenAddStudent && (
                 <button
                   onClick={onOpenAddStudent}
                   className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-semibold text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-xs"
@@ -104,13 +106,23 @@ export function DashboardHero({ onNavigate, onOpenAddStudent }: DashboardHeroPro
                 </button>
               )}
 
-              <button
-                onClick={() => onNavigate('judging')}
-                className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-900 dark:text-indigo-300 font-semibold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all cursor-pointer"
-              >
-                <Radio className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-                <span>Judge Panel (Blind)</span>
-              </button>
+              {isAdmin ? (
+                <button
+                  onClick={() => onNavigate('judging')}
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-900 dark:text-indigo-300 font-semibold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all cursor-pointer"
+                >
+                  <Radio className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+                  <span>Judge Panel (Blind)</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => onNavigate('schedule')}
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-semibold text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-xs"
+                >
+                  <Calendar className="w-4 h-4 text-neutral-500" />
+                  <span>Programme Schedule</span>
+                </button>
+              )}
             </div>
           </div>
 

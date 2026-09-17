@@ -26,25 +26,46 @@ import { useFestStore } from '@/hooks/useFestStore';
 export function AppShell() {
   const festStore = useFestStore();
   const settings = festStore.getSettings();
+  const session = festStore.getSession();
 
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
 
   useEffect(() => {
     store.initClient();
   }, []);
 
+  const viewerRestricted: NavTab[] = [
+    'judging',
+    'attendance',
+    'registrations',
+    'reports',
+    'settings',
+  ];
+
+  // Derive active tab safely: if viewer is on restricted tab, default to dashboard
+  const activeTab: NavTab =
+    session.role === 'VIEWER' && viewerRestricted.includes(currentTab)
+      ? 'dashboard'
+      : currentTab;
+
   // Selected student / competition from search
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
 
   const handleNavigate = (tab: NavTab) => {
-    setCurrentTab(tab);
+    if (session.role === 'VIEWER' && viewerRestricted.includes(tab)) {
+      setCurrentTab('dashboard');
+    } else {
+      setCurrentTab(tab);
+    }
+    setIsNavMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenAddStudent = () => {
+    if (session.role !== 'ADMIN') return;
     setIsAddStudentOpen(true);
     setCurrentTab('students');
   };
@@ -60,37 +81,29 @@ export function AppShell() {
   };
 
   const handleNavigateToJudging = (comp: Competition) => {
+    if (session.role === 'VIEWER') return;
     setSelectedComp(comp);
     setCurrentTab('judging');
   };
 
   return (
     <div className="min-h-screen bg-[#F7F7F5] dark:bg-[#050505] text-neutral-900 dark:text-neutral-100 flex transition-colors duration-200">
-      {/* Desktop Sidebar (hidden on print and mobile) */}
-      <div className="hidden lg:block h-screen sticky top-0 z-30">
-        <Sidebar
-          currentTab={currentTab}
-          onSelectTab={handleNavigate}
-          onOpenAddStudent={handleOpenAddStudent}
-        />
-      </div>
-
-      {/* Mobile Drawer and Bottom Nav */}
+      {/* Navigation Drawer (Appears when clicking menu bar on all screen sizes) */}
       <MobileNav
-        currentTab={currentTab}
+        currentTab={activeTab}
         onSelectTab={handleNavigate}
-        isDrawerOpen={isMobileDrawerOpen}
-        onToggleDrawer={setIsMobileDrawerOpen}
+        isDrawerOpen={isNavMenuOpen}
+        onToggleDrawer={setIsNavMenuOpen}
         onOpenAddStudent={handleOpenAddStudent}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-8">
-        {/* TopBar */}
+        {/* TopBar with only Notification and Menu bar button */}
         <TopBar
-          currentTab={currentTab}
+          currentTab={activeTab}
           onNavigate={handleNavigate}
-          onOpenMobileMenu={() => setIsMobileDrawerOpen(true)}
+          onOpenMobileMenu={() => setIsNavMenuOpen(true)}
           onOpenAddStudent={handleOpenAddStudent}
           onSelectStudent={handleSelectStudentFromSearch}
           onSelectCompetition={handleSelectCompFromSearch}
@@ -98,7 +111,7 @@ export function AppShell() {
 
         {/* Dynamic Page Views */}
         <main className="flex-1 px-4 sm:px-8 lg:px-12 py-6 sm:py-8 pb-28 lg:pb-12 max-w-7xl w-full mx-auto">
-          {currentTab === 'dashboard' && (
+          {activeTab === 'dashboard' && (
             <div className="space-y-12">
               <DashboardHero
                 onNavigate={handleNavigate}
@@ -110,7 +123,7 @@ export function AppShell() {
             </div>
           )}
 
-          {currentTab === 'students' && (
+          {activeTab === 'students' && (
             <StudentManager
               initialOpenAdd={isAddStudentOpen}
               onCloseAdd={() => setIsAddStudentOpen(false)}
@@ -118,34 +131,42 @@ export function AppShell() {
             />
           )}
 
-          {currentTab === 'teams' && <TeamManager />}
+          {activeTab === 'teams' && <TeamManager />}
 
-          {currentTab === 'categories' && <CategoryManager />}
+          {activeTab === 'categories' && <CategoryManager />}
 
-          {currentTab === 'competitions' && (
+          {activeTab === 'competitions' && (
             <CompetitionManager
               onNavigateToJudging={handleNavigateToJudging}
               selectedFromSearch={selectedComp}
             />
           )}
 
-          {currentTab === 'registrations' && <RegistrationManager />}
+          {activeTab === 'registrations' && session.role === 'ADMIN' && (
+            <RegistrationManager />
+          )}
 
-          {currentTab === 'attendance' && <AttendanceLedger />}
+          {activeTab === 'attendance' && session.role === 'ADMIN' && (
+            <AttendanceLedger />
+          )}
 
-          {currentTab === 'judging' && (
+          {activeTab === 'judging' && session.role !== 'VIEWER' && (
             <JudgePanel initialCompetition={selectedComp} />
           )}
 
-          {currentTab === 'scoreboard' && <ScoreboardView />}
+          {activeTab === 'scoreboard' && <ScoreboardView />}
 
-          {currentTab === 'schedule' && (
+          {activeTab === 'schedule' && (
             <ScheduleTimeline onNavigateToJudging={handleNavigateToJudging} />
           )}
 
-          {currentTab === 'reports' && <ReportsCenter />}
+          {activeTab === 'reports' && session.role === 'ADMIN' && (
+            <ReportsCenter />
+          )}
 
-          {currentTab === 'settings' && <SettingsManager />}
+          {activeTab === 'settings' && session.role === 'ADMIN' && (
+            <SettingsManager />
+          )}
 
           {/* Official Footer with Dynamic Content */}
           <footer className="mt-16 pt-8 border-t border-black/5 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 dark:text-neutral-400 no-print">

@@ -70,6 +70,7 @@ export function TeamManager() {
 
   const handleSaveTeam = (e: React.FormEvent) => {
     e.preventDefault();
+    if (session.role !== 'ADMIN') return;
     if (!teamForm.name.trim() || !teamForm.shortCode.trim()) return;
 
     if (editingTeam) {
@@ -96,6 +97,7 @@ export function TeamManager() {
   };
 
   const handleDeleteTeam = (team: Team) => {
+    if (session.role !== 'ADMIN') return;
     if (
       window.confirm(
         `Are you sure you want to delete Team "${team.name}"? This is irreversible.`
@@ -107,6 +109,7 @@ export function TeamManager() {
 
   const handleApplyAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (session.role !== 'ADMIN') return;
     if (!adjustingTeam || !adjReason.trim()) return;
     store.addPointAdjustment(adjustingTeam.id, adjPoints, adjReason.trim());
     setAdjustingTeam(null);

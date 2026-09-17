@@ -1,32 +1,53 @@
--- ================================================================
--- FRAGANCIA ARTS FEST 2026 - MYSQL DATABASE SCHEMA & INITIAL DATA
--- Optimized for Hostinger Node.js & MySQL (phpMyAdmin / Direct Import)
--- Engine: InnoDB | Charset: utf8mb4 | Collation: utf8mb4_unicode_ci
--- ================================================================
+-- ==============================================================================
+-- FRAGANCIA ARTS FEST 2026 - MYSQL 8.x DATABASE SCHEMA
+-- Hostinger MySQL & phpMyAdmin Direct Import Ready
+-- 
+-- Compatible with MySQL 8.0+ / 8.4+ / MariaDB 10.5+
+-- Storage Engine: InnoDB
+-- Default Character Set: utf8mb4
+-- Default Collation: utf8mb4_unicode_ci
+-- ==============================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
--- ----------------------------------------------------------------
--- 1. Profiles Table (Users & Roles)
--- ----------------------------------------------------------------
+-- ==============================================================================
+-- DROP TABLES (Reverse Dependency Order for Clean Re-Import)
+-- ==============================================================================
+DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `schedule_items`;
+DROP TABLE IF EXISTS `point_adjustments`;
+DROP TABLE IF EXISTS `competition_results`;
+DROP TABLE IF EXISTS `marks`;
+DROP TABLE IF EXISTS `attendance`;
+DROP TABLE IF EXISTS `registrations`;
+DROP TABLE IF EXISTS `students`;
+DROP TABLE IF EXISTS `competitions`;
+DROP TABLE IF EXISTS `categories`;
+DROP TABLE IF EXISTS `teams`;
+DROP TABLE IF EXISTS `event_settings`;
 DROP TABLE IF EXISTS `profiles`;
+
+-- ==============================================================================
+-- 1. PROFILES TABLE (Authentication, Staff, Judges & RBAC)
+-- ==============================================================================
 CREATE TABLE `profiles` (
   `id` VARCHAR(64) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
-  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `email` VARCHAR(255) NOT NULL,
   `password_hash` VARCHAR(255) NULL,
   `role` ENUM('ADMIN', 'JUDGE', 'VIEWER') NOT NULL DEFAULT 'VIEWER',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_profiles_email` (`email`),
+  UNIQUE KEY `uniq_profiles_email` (`email`),
   KEY `idx_profiles_role` (`role`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 2. Event Settings Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `event_settings`;
+-- ==============================================================================
+-- 2. EVENT_SETTINGS TABLE (Fest Metadata, Rules, Points & Portal Config)
+-- ==============================================================================
 CREATE TABLE `event_settings` (
   `id` VARCHAR(64) NOT NULL,
   `event_name` VARCHAR(255) NOT NULL DEFAULT 'Fragancia Arts Fest 2026',
@@ -39,16 +60,16 @@ CREATE TABLE `event_settings` (
   `primary_accent` VARCHAR(50) NOT NULL DEFAULT '#0A0A0A',
   `hero_title_line1` VARCHAR(255) DEFAULT 'RUN THE FEST.',
   `hero_title_line2` VARCHAR(255) DEFAULT 'NOT THE SPREADSHEET.',
-  `hero_description` TEXT,
-  `announcement_text` TEXT,
+  `hero_description` TEXT NULL,
+  `announcement_text` TEXT NULL,
   `is_announcement_active` TINYINT(1) NOT NULL DEFAULT 0,
   `feature_subheading` VARCHAR(255) DEFAULT 'ARCHITECTURE & WORKFLOW',
   `feature_heading` VARCHAR(255) DEFAULT 'EVERYTHING IN ONE CONTROL CENTER.',
-  `feature_description` TEXT,
+  `feature_description` TEXT NULL,
   `pipeline_heading` VARCHAR(255) DEFAULT 'FROM REGISTRATION TO VICTORY.',
   `pipeline_subtitle` VARCHAR(255) DEFAULT 'Designed for high-speed fest days where volunteers, judges, and stage coordinators work in tandem.',
   `portal_status` ENUM('OPEN', 'CLOSED') NOT NULL DEFAULT 'OPEN',
-  `portal_closed_message` TEXT,
+  `portal_closed_message` TEXT NULL,
   `chest_number_prefix` VARCHAR(50) DEFAULT '',
   `max_registrations_per_student` INT NOT NULL DEFAULT 20,
   `chest_prefix_auto` TINYINT(1) NOT NULL DEFAULT 0,
@@ -68,43 +89,45 @@ CREATE TABLE `event_settings` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 3. Teams Table (Two Houses: TEAM SELJUK and TEAM MAMLUK)
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `teams`;
+-- ==============================================================================
+-- 3. TEAMS TABLE (Festival Houses / Sub-groups)
+-- ==============================================================================
 CREATE TABLE `teams` (
   `id` VARCHAR(64) NOT NULL,
-  `name` VARCHAR(255) NOT NULL UNIQUE,
-  `short_code` VARCHAR(50) NOT NULL UNIQUE,
+  `name` VARCHAR(255) NOT NULL,
+  `short_code` VARCHAR(50) NOT NULL,
   `color` VARCHAR(50) NOT NULL DEFAULT '#0A0A0A',
-  `description` TEXT,
+  `description` TEXT NULL,
   `captain` VARCHAR(255) NULL,
   `vice_captain` VARCHAR(255) NULL,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_teams_code` (`short_code`)
+  UNIQUE KEY `uniq_teams_name` (`name`),
+  UNIQUE KEY `uniq_teams_short_code` (`short_code`),
+  KEY `idx_teams_active` (`active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 4. Categories Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `categories`;
+-- ==============================================================================
+-- 4. CATEGORIES TABLE (Age Divisions & Stage Classifications)
+-- ==============================================================================
 CREATE TABLE `categories` (
   `id` VARCHAR(64) NOT NULL,
-  `name` VARCHAR(255) NOT NULL UNIQUE,
+  `name` VARCHAR(255) NOT NULL,
   `min_age` INT NOT NULL DEFAULT 5,
   `max_age` INT NOT NULL DEFAULT 25,
-  `description` TEXT,
+  `max_competitions_per_student` INT NOT NULL DEFAULT 10,
+  `description` TEXT NULL,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_categories_name` (`name`),
+  KEY `idx_categories_active` (`active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 5. Competitions Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `competitions`;
+-- ==============================================================================
+-- 5. COMPETITIONS TABLE (All 80+ Festival Events / Programmes)
+-- ==============================================================================
 CREATE TABLE `competitions` (
   `id` VARCHAR(64) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
@@ -113,7 +136,7 @@ CREATE TABLE `competitions` (
   `stage_type` ENUM('On Stage', 'Off Stage') NOT NULL DEFAULT 'On Stage',
   `max_participants` INT NOT NULL DEFAULT 20,
   `time_limit` VARCHAR(50) NOT NULL DEFAULT '7 Mins',
-  `rules` TEXT,
+  `rules` TEXT NULL,
   `first_place_points` INT NOT NULL DEFAULT 10,
   `second_place_points` INT NOT NULL DEFAULT 7,
   `third_place_points` INT NOT NULL DEFAULT 5,
@@ -130,18 +153,18 @@ CREATE TABLE `competitions` (
   KEY `idx_comp_category` (`category_id`),
   KEY `idx_comp_status` (`status`),
   KEY `idx_comp_stage_type` (`stage_type`),
+  KEY `idx_comp_result_status` (`result_status`),
   CONSTRAINT `fk_comp_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 6. Students Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `students`;
+-- ==============================================================================
+-- 6. STUDENTS TABLE (Roster, Chest Numbers, Team & Category Assignments)
+-- ==============================================================================
 CREATE TABLE `students` (
   `id` VARCHAR(64) NOT NULL,
   `full_name` VARCHAR(255) NOT NULL,
-  `admission_no` VARCHAR(100) NOT NULL UNIQUE,
-  `chest_number` VARCHAR(100) NOT NULL UNIQUE,
+  `admission_no` VARCHAR(100) NOT NULL,
+  `chest_number` VARCHAR(100) NOT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `team_id` VARCHAR(64) NOT NULL,
   `category_id` VARCHAR(64) NOT NULL,
@@ -151,18 +174,18 @@ CREATE TABLE `students` (
   `status` ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_students_admission` (`admission_no`),
-  KEY `idx_students_chest` (`chest_number`),
+  UNIQUE KEY `uniq_students_admission_no` (`admission_no`),
+  UNIQUE KEY `uniq_students_chest_number` (`chest_number`),
   KEY `idx_students_team` (`team_id`),
   KEY `idx_students_category` (`category_id`),
+  KEY `idx_students_status` (`status`),
   CONSTRAINT `fk_students_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_students_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 7. Registrations Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `registrations`;
+-- ==============================================================================
+-- 7. REGISTRATIONS TABLE (Student Entries & Secret Code Letter Assignments)
+-- ==============================================================================
 CREATE TABLE `registrations` (
   `id` VARCHAR(64) NOT NULL,
   `competition_id` VARCHAR(64) NOT NULL,
@@ -171,17 +194,18 @@ CREATE TABLE `registrations` (
   `status` ENUM('Registered', 'Cancelled', 'Waitlisted') NOT NULL DEFAULT 'Registered',
   `registered_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_comp_student` (`competition_id`, `student_id`),
-  KEY `idx_reg_competition` (`competition_id`),
+  UNIQUE KEY `uniq_reg_comp_student` (`competition_id`, `student_id`),
+  KEY `idx_reg_comp` (`competition_id`),
   KEY `idx_reg_student` (`student_id`),
+  KEY `idx_reg_status` (`status`),
+  KEY `idx_reg_code_letter` (`code_letter`),
   CONSTRAINT `fk_reg_competition` FOREIGN KEY (`competition_id`) REFERENCES `competitions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_reg_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 8. Attendance Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `attendance`;
+-- ==============================================================================
+-- 8. ATTENDANCE TABLE (Stage Call Sheets & Participant Roll-Call)
+-- ==============================================================================
 CREATE TABLE `attendance` (
   `id` VARCHAR(64) NOT NULL,
   `competition_id` VARCHAR(64) NOT NULL,
@@ -189,17 +213,17 @@ CREATE TABLE `attendance` (
   `status` ENUM('Present', 'Absent') NOT NULL DEFAULT 'Present',
   `marked_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_attendance_comp_student` (`competition_id`, `student_id`),
-  KEY `idx_att_competition` (`competition_id`),
+  UNIQUE KEY `uniq_att_comp_student` (`competition_id`, `student_id`),
+  KEY `idx_att_comp` (`competition_id`),
   KEY `idx_att_student` (`student_id`),
+  KEY `idx_att_status` (`status`),
   CONSTRAINT `fk_att_competition` FOREIGN KEY (`competition_id`) REFERENCES `competitions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_att_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 9. Marks Table (Judge Scoring)
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `marks`;
+-- ==============================================================================
+-- 9. MARKS TABLE (Blind Judge Scoring, Rubric Breakdowns & Feedback)
+-- ==============================================================================
 CREATE TABLE `marks` (
   `id` VARCHAR(64) NOT NULL,
   `competition_id` VARCHAR(64) NOT NULL,
@@ -212,32 +236,33 @@ CREATE TABLE `marks` (
   `feedback` TEXT DEFAULT NULL,
   `submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_comp_student_judge` (`competition_id`, `student_id`, `judge_name`),
-  KEY `idx_marks_competition` (`competition_id`),
+  UNIQUE KEY `uniq_marks_comp_student_judge` (`competition_id`, `student_id`, `judge_name`),
+  KEY `idx_marks_comp` (`competition_id`),
   KEY `idx_marks_student` (`student_id`),
+  KEY `idx_marks_judge` (`judge_name`),
   CONSTRAINT `fk_marks_competition` FOREIGN KEY (`competition_id`) REFERENCES `competitions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_marks_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 10. Competition Results Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `competition_results`;
+-- ==============================================================================
+-- 10. COMPETITION_RESULTS TABLE (Draft & Published Results / Rankings)
+-- ==============================================================================
 CREATE TABLE `competition_results` (
   `id` VARCHAR(64) NOT NULL,
-  `competition_id` VARCHAR(64) NOT NULL UNIQUE,
+  `competition_id` VARCHAR(64) NOT NULL,
   `rankings` JSON NOT NULL,
   `status` ENUM('Draft', 'Published') NOT NULL DEFAULT 'Draft',
   `published_at` TIMESTAMP NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_results_comp` (`competition_id`),
+  KEY `idx_results_status` (`status`),
   CONSTRAINT `fk_results_competition` FOREIGN KEY (`competition_id`) REFERENCES `competitions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 11. Point Adjustments Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `point_adjustments`;
+-- ==============================================================================
+-- 11. POINT_ADJUSTMENTS TABLE (Discretionary Bonus & Penalty Points)
+-- ==============================================================================
 CREATE TABLE `point_adjustments` (
   `id` VARCHAR(64) NOT NULL,
   `team_id` VARCHAR(64) NOT NULL,
@@ -247,13 +272,13 @@ CREATE TABLE `point_adjustments` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_adj_team` (`team_id`),
+  KEY `idx_adj_created_at` (`created_at`),
   CONSTRAINT `fk_adj_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 12. Schedule Items Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `schedule_items`;
+-- ==============================================================================
+-- 12. SCHEDULE_ITEMS TABLE (Fest Timeline, Venues & Programme Sequencing)
+-- ==============================================================================
 CREATE TABLE `schedule_items` (
   `id` VARCHAR(64) NOT NULL,
   `title` VARCHAR(255) NOT NULL,
@@ -266,13 +291,14 @@ CREATE TABLE `schedule_items` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_sch_comp` (`competition_id`),
+  KEY `idx_sch_stage` (`stage`),
+  KEY `idx_sch_status` (`status`),
   CONSTRAINT `fk_sch_comp` FOREIGN KEY (`competition_id`) REFERENCES `competitions` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------
--- 13. Audit Logs Table
--- ----------------------------------------------------------------
-DROP TABLE IF EXISTS `audit_logs`;
+-- ==============================================================================
+-- 13. AUDIT_LOGS TABLE (System Operations, Timestamped Audit Trail)
+-- ==============================================================================
 CREATE TABLE `audit_logs` (
   `id` VARCHAR(64) NOT NULL,
   `action` VARCHAR(100) NOT NULL,
@@ -280,672 +306,14 @@ CREATE TABLE `audit_logs` (
   `user_email` VARCHAR(255) NOT NULL,
   `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_logs_timestamp` (`timestamp`)
+  KEY `idx_logs_timestamp` (`timestamp`),
+  KEY `idx_logs_user` (`user_email`),
+  KEY `idx_logs_action` (`action`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ================================================================
--- INITIAL SEED DATA
--- ================================================================
-
--- Default Profile
-INSERT INTO `profiles` (`id`, `name`, `email`, `role`) VALUES
-('usr-admin', 'Fest Director (Admin)', 'admin@fragancia.local', 'ADMIN'),
-('usr-judge-1', 'Ustad Abdul Rahman (Chief Judge)', 'judge1@fragancia.local', 'JUDGE');
-
--- Default Settings
-INSERT INTO `event_settings` (
-  `id`, `event_name`, `institute_name`, `logo_text`, `subtitle`, `academic_year`, `venue`, `event_dates`, `primary_accent`,
-  `portal_status`, `max_registrations_per_student`, `default_first_points`, `default_second_points`, `default_third_points`,
-  `footer_text`, `copyright`, `helpdesk_contact`, `signatory1_title`, `signatory2_title`, `theme_mode`
-) VALUES (
-  'settings-1',
-  'Fragancia Arts Fest 2026',
-  'Fragancia Committee',
-  'FRAGANCIA',
-  'Grand Arts & Cultural Fest 2026',
-  '2026-2027',
-  'Main Campus, Grand Auditorium & Open Stage',
-  'September 15 - 17, 2026',
-  '#0A0A0A',
-  'OPEN',
-  20,
-  10,
-  7,
-  5,
-  'Fragancia Fest Organising Committee • developed by rafidotcom.in',
-  '© 2026 Fragancia. All rights reserved.',
-  'Control Room: Stage 1 Helpdesk | Ph: +91 98470 00000',
-  'Chief Controller / Convener',
-  'General Secretary / Chairman',
-  'dark'
-);
-
--- Teams
-INSERT INTO `teams` (`id`, `name`, `short_code`, `color`, `description`, `captain`, `vice_captain`, `active`) VALUES
-('team-1', 'TEAM SELJUK', 'SELJUK', '#0A0A0A', 'Leader: 310 MUHAMMED RAZI K • Sub: 311 MUHAMMED RAZEEN MK', '310 MUHAMMED RAZI K', '311 MUHAMMED RAZEEN MK', 1),
-('team-2', 'TEAM MAMLUK', 'MAMLUK', '#4338CA', 'Leader: 410 YOONUS P • Sub: 411 ZIYAD KUTHAR', '410 YOONUS P', '411 ZIYAD KUTHAR', 1);
-
--- Initial Point Adjustments
-INSERT INTO `point_adjustments` (`id`, `team_id`, `points`, `reason`, `created_by`) VALUES
-('adj-1', 'team-1', 5, 'Exemplary Pavilion Discipline & Cleanliness', 'admin@fragancia.local'),
-('adj-2', 'team-2', 5, 'Volunteer Marshaling & Stage Assistance', 'admin@fragancia.local');
-
--- Categories
-INSERT INTO `categories` (`id`, `name`, `min_age`, `max_age`, `description`, `active`) VALUES
-('cat-senior-on', 'Senior On Stage', 14, 19, 'Senior category on-stage stage performance events', 1),
-('cat-senior-off', 'Senior Off Stage', 14, 19, 'Senior category off-stage writing, art & academic events', 1),
-('cat-junior-on', 'Junior On Stage', 10, 13, 'Junior category on-stage performance events', 1),
-('cat-junior-off', 'Junior Off Stage', 10, 13, 'Junior category off-stage writing, art & knowledge events', 1),
-('cat-general', 'General', 10, 25, 'Open to all houses and age groups (Solo & Group events)', 1);
-
--- Competitions (82 total)
-INSERT INTO `competitions` (
-  `id`, `name`, `type`, `category_id`, `stage_type`, `max_participants`, `time_limit`, `rules`,
-  `first_place_points`, `second_place_points`, `third_place_points`, `status`, `stage`,
-  `start_time`, `scheduled_time`, `duration_minutes`, `scoring_criteria`, `result_status`, `published_at`
-) VALUES
-('comp-sen-on-1', 'ELOCUTION (MAL)', 'Single', 'cat-senior-on', 'On Stage', 12, '5 Mins', 'Malayalam elocution. Subject will be given. Strict 5-minute time limit.', 10, 7, 5, 'Completed', 'Main Stage', '09:00 AM', '09:00 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Published', '2026-09-02T16:00:00Z'),
-('comp-sen-on-2', 'ELOCUTION (ENG)', 'Single', 'cat-senior-on', 'On Stage', 12, '5 Mins', 'English elocution. Clarity of thought, grammar and pronunciation assessed.', 10, 7, 5, 'Upcoming', 'Main Stage', '10:15 AM', '10:15 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-3', 'ELOCUTION (ARB)', 'Single', 'cat-senior-on', 'On Stage', 10, '5 Mins', 'Classical Arabic rhetoric and elocution with standard Fusha delivery.', 10, 7, 5, 'Upcoming', 'Main Stage', '11:30 AM', '11:30 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-4', 'MAPPILAPPATT', 'Single', 'cat-senior-on', 'On Stage', 15, '5 Mins', 'Traditional Mappila song rendition adhering to classical Ishals.', 10, 7, 5, 'Live', 'Main Stage', '02:00 PM', '02:00 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-5', 'SPOT SPEECH', 'Single', 'cat-senior-on', 'On Stage', 12, '4 Mins', 'Extempore speech on given lot. 2 minutes prep, 4 minutes speech.', 10, 7, 5, 'Upcoming', 'Main Stage', '03:30 PM', '03:30 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-6', 'MADH GANAM', 'Single', 'cat-senior-on', 'On Stage', 15, '5 Mins', 'Prophetic praise hymn recital. Melody, diction and emotional cadence.', 10, 7, 5, 'Upcoming', 'Main Stage', '04:30 PM', '04:30 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-7', 'QUTHUBA', 'Single', 'cat-senior-on', 'On Stage', 10, '7 Mins', 'Friday sermon (Khutbah) address following prophetic tradition.', 10, 7, 5, 'Upcoming', 'Main Stage', '05:45 PM', '05:45 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-8', 'QIRATH', 'Single', 'cat-senior-on', 'On Stage', 15, '6 Mins', 'Holy Qur’an recitation with Tajweed rules and Maqamat cadence.', 10, 7, 5, 'Live', 'Main Stage', '10:00 AM', '10:00 AM', 10, '[{"id":"sc-1","name":"Tajweed & Pronunciation","maxScore":35},{"id":"sc-2","name":"Voice & Melodic Control","maxScore":35},{"id":"sc-3","name":"Memorization / Accuracy","maxScore":30}]', 'Draft', NULL),
-('comp-sen-on-9', 'SPOKEN TRA ENG —ARB', 'Single', 'cat-senior-on', 'On Stage', 10, '5 Mins', 'Simultaneous on-the-spot oral translation from English into Arabic.', 10, 7, 5, 'Upcoming', 'Main Stage', '02:30 PM', '02:30 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-on-10', 'SPOKEN TRA MAL— ENG', 'Single', 'cat-senior-on', 'On Stage', 10, '5 Mins', 'Simultaneous on-the-spot oral translation from Malayalam into English.', 10, 7, 5, 'Upcoming', 'Main Stage', '03:45 PM', '03:45 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-1', 'THADREES', 'Single', 'cat-senior-off', 'Off Stage', 10, '10 Mins', 'Classroom teaching methodology demonstration on classical text.', 10, 7, 5, 'Upcoming', '', '09:00 AM', '09:00 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-2', 'HIFZ', 'Single', 'cat-senior-off', 'Off Stage', 15, '15 Mins', 'Holy Qur’an memorization examination with question prompts.', 10, 7, 5, 'Upcoming', '', '09:30 AM', '09:30 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-3', 'HADEES WRITING', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Prophetic traditions transcription and commentary examination.', 10, 7, 5, 'Upcoming', '', '10:00 AM', '10:00 AM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-4', 'ESSAY (MAL)', 'Single', 'cat-senior-off', 'Off Stage', 25, '60 Mins', 'Malayalam essay writing on declared topic. Word limit: 1000 words.', 10, 7, 5, 'Completed', '', '11:00 AM', '11:00 AM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Published', '2026-09-02T14:00:00Z'),
-('comp-sen-off-5', 'ESSAY (ENG)', 'Single', 'cat-senior-off', 'Off Stage', 25, '60 Mins', 'English essay writing. Analytical structure and rhetoric assessed.', 10, 7, 5, 'Upcoming', '', '01:30 PM', '01:30 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-6', 'ESSAY (ARB)', 'Single', 'cat-senior-off', 'Off Stage', 20, '60 Mins', 'Arabic essay writing evaluating classical expressions and vocabulary.', 10, 7, 5, 'Upcoming', '', '02:45 PM', '02:45 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-7', 'POEM MAKING', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Creative verse composition with imagery and rhyming meter.', 10, 7, 5, 'Upcoming', '', '09:15 AM', '09:15 AM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-8', 'MADH GANA RACHANA', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Original devotional lyrical composition honoring the Prophet (pbuh).', 10, 7, 5, 'Upcoming', '', '10:30 AM', '10:30 AM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-9', 'BOOK TEST', 'Single', 'cat-senior-off', 'Off Stage', 30, '60 Mins', 'Comprehensive assessment on assigned literature text.', 10, 7, 5, 'Upcoming', '', '11:45 AM', '11:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-10', 'TRA-ARB-ENG', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Written translation paper from Arabic into English.', 10, 7, 5, 'Upcoming', '', '01:15 PM', '01:15 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-11', 'QUIZ', 'Single', 'cat-senior-off', 'Off Stage', 30, '45 Mins', 'Written knowledge championship covering global, science and Islamic history.', 10, 7, 5, 'Upcoming', '', '02:15 PM', '02:15 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-12', 'MUDHRAVAKYA RACHANA', 'Single', 'cat-senior-off', 'Off Stage', 20, '30 Mins', 'Catchy slogan and moral motto creation on the given social theme.', 10, 7, 5, 'Upcoming', '', '03:15 PM', '03:15 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-13', 'POSTER DESIGNING', 'Single', 'cat-senior-off', 'Off Stage', 20, '90 Mins', 'Manual poster design on chart with typography and visual layout.', 10, 7, 5, 'Upcoming', '', '10:00 AM', '10:00 AM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-sen-off-14', 'PENCIL DRAWING', 'Single', 'cat-senior-off', 'Off Stage', 20, '60 Mins', 'Graphite pencil drawing showcasing tonal shading and proportion.', 10, 7, 5, 'Upcoming', '', '01:30 PM', '01:30 PM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-sen-off-15', 'SOCIAL TWEET', 'Single', 'cat-senior-off', 'Off Stage', 20, '30 Mins', 'Punchy micro-blog commentary under 280 characters with hashtags.', 10, 7, 5, 'Upcoming', '', '03:45 PM', '03:45 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-16', 'HIQUE POEM MAKING', 'Single', 'cat-senior-off', 'Off Stage', 20, '30 Mins', 'Haiku / 3-line structured verse composition with vivid imagery.', 10, 7, 5, 'Upcoming', '', '04:30 PM', '04:30 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-sen-off-17', 'SPOT SWARF', 'Single', 'cat-senior-off', 'Off Stage', 15, '30 Mins', 'Advanced Arabic morphology (Sarf) conjugations and pattern solving.', 10, 7, 5, 'Upcoming', '', '11:00 AM', '11:00 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-18', 'NAHV TEST', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Arabic grammar & syntax (Nahw) parsing, rules and I’rab test.', 10, 7, 5, 'Upcoming', '', '01:45 PM', '01:45 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-19', 'IFTHAH', 'Single', 'cat-senior-off', 'Off Stage', 15, '60 Mins', 'Jurisprudential problem solving and Fiqh reference deduction.', 10, 7, 5, 'Upcoming', '', '10:45 AM', '10:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-20', 'BALAGHA TEST', 'Single', 'cat-senior-off', 'Off Stage', 20, '45 Mins', 'Arabic rhetoric (Balaghah), metaphor, and linguistic eloquence test.', 10, 7, 5, 'Upcoming', '', '03:00 PM', '03:00 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-sen-off-21', 'NEWS READING ENG', 'Single', 'cat-senior-off', 'Off Stage', 15, '4 Mins', 'English broadcast news reading. Tone, clarity, and teleprompter style.', 10, 7, 5, 'Upcoming', '', '04:15 PM', '04:15 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-sen-off-22', 'NEWS WRITING ENG', 'Single', 'cat-senior-off', 'Off Stage', 15, '45 Mins', 'English news reporting, headline crafting, and analytical lead composition.', 10, 7, 5, 'Upcoming', '', '04:45 PM', '04:45 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-on-1', 'ELOCUTION (MAL)', 'Single', 'cat-junior-on', 'On Stage', 12, '4 Mins', 'Junior Malayalam speech competition on moral or inspirational themes.', 10, 7, 5, 'Upcoming', 'Main Stage', '09:00 AM', '09:00 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-2', 'ELOCUTION (ENG)', 'Single', 'cat-junior-on', 'On Stage', 12, '4 Mins', 'Junior English speech competition. Fluency and pronunciation assessed.', 10, 7, 5, 'Upcoming', 'Main Stage', '10:15 AM', '10:15 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-3', 'ELOCUTION (ARB)', 'Single', 'cat-junior-on', 'On Stage', 10, '4 Mins', 'Junior Arabic speech competition.', 10, 7, 5, 'Upcoming', 'Main Stage', '11:30 AM', '11:30 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-4', 'MAPPILAPPATT', 'Single', 'cat-junior-on', 'On Stage', 15, '4 Mins', 'Junior traditional Mappila song rendition.', 10, 7, 5, 'Upcoming', 'Main Stage', '01:30 PM', '01:30 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-5', 'ARABIC SONG', 'Single', 'cat-junior-on', 'On Stage', 15, '4 Mins', 'Melodious solo Arabic song performance.', 10, 7, 5, 'Upcoming', 'Main Stage', '02:45 PM', '02:45 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-6', 'BAKTHI GANAM', 'Single', 'cat-junior-on', 'On Stage', 15, '4 Mins', 'Devotional hymn recital with melody and sincere expression.', 10, 7, 5, 'Upcoming', 'Main Stage', '03:45 PM', '03:45 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-7', 'KAVITHA RECITATION', 'Single', 'cat-junior-on', 'On Stage', 15, '4 Mins', 'Poetry recitation with emotional depth, cadence and rhythm.', 10, 7, 5, 'Upcoming', 'Main Stage', '04:45 PM', '04:45 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-8', 'QIRATH', 'Single', 'cat-junior-on', 'On Stage', 15, '5 Mins', 'Holy Qur’an recitation adhering to Tajweed rules.', 10, 7, 5, 'Live', 'Main Stage', '10:00 AM', '10:00 AM', 10, '[{"id":"sc-1","name":"Tajweed & Pronunciation","maxScore":35},{"id":"sc-2","name":"Voice Melody","maxScore":35},{"id":"sc-3","name":"Memorization","maxScore":30}]', 'Draft', NULL),
-('comp-jun-on-9', 'SPELLING-B', 'Single', 'cat-junior-on', 'On Stage', 15, '10 Mins', 'Oral English spelling bee with progressive difficulty rounds.', 10, 7, 5, 'Upcoming', 'Main Stage', '05:30 PM', '05:30 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-on-10', 'STORY TELLING', 'Single', 'cat-junior-on', 'On Stage', 15, '5 Mins', 'Moral storytelling with expressive voice modulation and gestures.', 10, 7, 5, 'Upcoming', 'Main Stage', '06:15 PM', '06:15 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-1', 'THADREES', 'Single', 'cat-junior-off', 'Off Stage', 12, '8 Mins', 'Junior teaching presentation of fundamental religious tenets.', 10, 7, 5, 'Upcoming', '', '09:00 AM', '09:00 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-2', 'MAASHIRA', 'Single', 'cat-junior-off', 'Off Stage', 15, '30 Mins', 'Etiquette and social manners knowledge test.', 10, 7, 5, 'Upcoming', '', '09:45 AM', '09:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-3', 'BANK', 'Single', 'cat-junior-off', 'Off Stage', 15, '5 Mins', 'Adhan (Call to Prayer) vocal delivery with Tajweed rules and beauty.', 10, 7, 5, 'Upcoming', '', '10:30 AM', '10:30 AM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-4', 'ESSAY (MAL)', 'Single', 'cat-junior-off', 'Off Stage', 25, '45 Mins', 'Junior Malayalam essay writing on moral values.', 10, 7, 5, 'Upcoming', '', '11:15 AM', '11:15 AM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-5', 'ESSAY (ENG)', 'Single', 'cat-junior-off', 'Off Stage', 25, '45 Mins', 'Junior English essay writing.', 10, 7, 5, 'Upcoming', '', '01:30 PM', '01:30 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-6', 'STORY WRITING', 'Single', 'cat-junior-off', 'Off Stage', 25, '45 Mins', 'Creative story writing with plot and positive message.', 10, 7, 5, 'Upcoming', '', '02:30 PM', '02:30 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-7', 'BOOK TEST', 'Single', 'cat-junior-off', 'Off Stage', 30, '45 Mins', 'Junior assessment based on prescribed reading book.', 10, 7, 5, 'Upcoming', '', '10:00 AM', '10:00 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-8', 'PENCIL DRAWING', 'Single', 'cat-junior-off', 'Off Stage', 25, '60 Mins', 'Pencil drawing of assigned landscape or still life.', 10, 7, 5, 'Upcoming', '', '11:00 AM', '11:00 AM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-9', 'WATER COLORING', 'Single', 'cat-junior-off', 'Off Stage', 25, '60 Mins', 'Water coloring on provided sheet. Color harmony evaluated.', 10, 7, 5, 'Upcoming', '', '02:00 PM', '02:00 PM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-10', 'TRA-ENG-MAL', 'Single', 'cat-junior-off', 'Off Stage', 20, '30 Mins', 'Written sentence translation from English to Malayalam.', 10, 7, 5, 'Upcoming', '', '03:30 PM', '03:30 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-11', 'HAND WRITTING ENG', 'Single', 'cat-junior-off', 'Off Stage', 30, '30 Mins', 'English cursive calligraphy and handwriting penmanship test.', 10, 7, 5, 'Upcoming', '', '04:15 PM', '04:15 PM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-12', 'QUTZ', 'Single', 'cat-junior-off', 'Off Stage', 30, '45 Mins', 'Junior general and Islamic quiz test.', 10, 7, 5, 'Upcoming', '', '03:15 PM', '03:15 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-13', 'MUDHIRAVAKYA RACHANA', 'Single', 'cat-junior-off', 'Off Stage', 20, '30 Mins', 'Junior slogan making promoting ethics and peace.', 10, 7, 5, 'Upcoming', '', '05:00 PM', '05:00 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-14', 'KITHAB READING', 'Single', 'cat-junior-off', 'Off Stage', 15, '10 Mins', 'Classical Arabic primer recitation and translation reading.', 10, 7, 5, 'Upcoming', '', '10:45 AM', '10:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-15', 'SPOT SWARF', 'Single', 'cat-junior-off', 'Off Stage', 15, '30 Mins', 'Basic Arabic verb conjugations on the spot.', 10, 7, 5, 'Upcoming', '', '11:45 AM', '11:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-16', 'PIRAMID WRITTING', 'Single', 'cat-junior-off', 'Off Stage', 20, '30 Mins', 'Pyramid word/sentence building writing exercise.', 10, 7, 5, 'Upcoming', '', '01:00 PM', '01:00 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-17', 'POEM WRITING', 'Single', 'cat-junior-off', 'Off Stage', 20, '45 Mins', 'Junior original poem composition.', 10, 7, 5, 'Upcoming', '', '02:00 PM', '02:00 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-18', 'GANITHA KELI', 'Single', 'cat-junior-off', 'Off Stage', 25, '45 Mins', 'Fun mathematics puzzles, numerical logic and brain teasers.', 10, 7, 5, 'Upcoming', '', '03:00 PM', '03:00 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-19', 'HIFZ', 'Single', 'cat-junior-off', 'Off Stage', 20, '10 Mins', 'Junior Qur’an memorization examination (Juz’ Amma).', 10, 7, 5, 'Upcoming', '', '01:30 PM', '01:30 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-20', 'READING ENG', 'Single', 'cat-junior-off', 'Off Stage', 20, '4 Mins', 'English prose reading fluency, pronunciation and punctuation.', 10, 7, 5, 'Upcoming', '', '04:00 PM', '04:00 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-jun-off-21', 'PADHA KALARI ARB-MAL', 'Single', 'cat-junior-off', 'Off Stage', 20, '30 Mins', 'Arabic to Malayalam word match and vocabulary puzzle challenge.', 10, 7, 5, 'Upcoming', '', '04:45 PM', '04:45 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-jun-off-22', 'MADH GANA RACHANA', 'Single', 'cat-junior-off', 'Off Stage', 20, '45 Mins', 'Junior devotional hymn lyric writing.', 10, 7, 5, 'Upcoming', '', '05:30 PM', '05:30 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-23', 'NEWS WRITTING', 'Single', 'cat-junior-off', 'Off Stage', 20, '45 Mins', 'News reporting and headline writing based on event summary.', 10, 7, 5, 'Upcoming', '', '06:15 PM', '06:15 PM', 10, '[{"id":"c1","name":"Creativity & Thought Depth","maxScore":40},{"id":"c2","name":"Language, Vocabulary & Grammar","maxScore":40},{"id":"c3","name":"Structure & Presentation","maxScore":20}]', 'Draft', NULL),
-('comp-jun-off-24', 'MOULID HADHEES RECITATION', 'Single', 'cat-junior-off', 'Off Stage', 20, '5 Mins', 'Melodious and accurate recitation of traditional Moulid prose and prophetic Hadith.', 10, 7, 5, 'Upcoming', '', '06:45 PM', '06:45 PM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-gen-1', 'QAVALI', 'Group', 'cat-general', 'On Stage', 8, '12 Mins', 'House Qawwali musical team presentation with chorus and clap rhythm.', 15, 10, 7, 'Upcoming', 'Main Stage', '07:00 PM', '07:00 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-2', 'NASHEEDНА', 'Group', 'cat-general', 'On Stage', 8, '8 Mins', 'Group choral Arabic/Malayalam nasheed singing.', 15, 10, 7, 'Upcoming', 'Main Stage', '08:00 PM', '08:00 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-3', 'GROUP SONG A', 'Group', 'cat-general', 'On Stage', 8, '8 Mins', 'House group song category A.', 15, 10, 7, 'Upcoming', 'Main Stage', '02:30 PM', '02:30 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-4', 'GROUP SONG B', 'Group', 'cat-general', 'On Stage', 8, '8 Mins', 'House group song category B.', 15, 10, 7, 'Upcoming', 'Main Stage', '03:45 PM', '03:45 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-5', 'VIPLAVA GANAM', 'Single', 'cat-general', 'On Stage', 15, '5 Mins', 'Revolutionary and inspirational anthem song.', 10, 7, 5, 'Upcoming', 'Main Stage', '05:00 PM', '05:00 PM', 10, '[{"id":"c1","name":"Vocal Melody & Pitch","maxScore":35},{"id":"c2","name":"Rhythm & Tempo (Talam)","maxScore":35},{"id":"c3","name":"Pronunciation & Emotion","maxScore":30}]', 'Draft', NULL),
-('comp-gen-6', 'VLOG', 'Single', 'cat-general', 'On Stage', 15, '5 Mins', 'Video log capturing fest atmosphere, interviews and montage.', 10, 7, 5, 'Upcoming', 'Main Stage', '06:00 PM', '06:00 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-gen-7', 'BAITH MUSHARA', 'Group', 'cat-general', 'On Stage', 6, '15 Mins', 'House vs House Bayt Mushairah poetic duel with instantaneous verse recall.', 15, 10, 7, 'Upcoming', 'Main Stage', '08:45 PM', '08:45 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-8', 'LECTURING', 'Single', 'cat-general', 'On Stage', 12, '10 Mins', 'Scholarly public lecture with thesis presentation and rebuttal.', 10, 7, 5, 'Upcoming', 'Main Stage', '10:30 AM', '10:30 AM', 10, '[{"id":"c1","name":"Content & Research","maxScore":35},{"id":"c2","name":"Fluency & Diction","maxScore":35},{"id":"c3","name":"Stage Demeanor & Time","maxScore":30}]', 'Draft', NULL),
-('comp-gen-9', 'ALFIYA MUSABAKA', 'Single', 'cat-general', 'On Stage', 12, '10 Mins', 'Alfiyyah Ibn Malik memorization challenge and grammatic rules defense.', 10, 7, 5, 'Upcoming', 'Main Stage', '11:45 AM', '11:45 AM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-gen-10', 'PROJECT', 'Group', 'cat-general', 'On Stage', 5, '120 Mins', 'Working educational / scientific model project showcase and defense.', 15, 10, 7, 'Upcoming', 'Main Stage', '01:00 PM', '01:00 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-11', 'SPOT MAGAZINE', 'Group', 'cat-general', 'On Stage', 5, '180 Mins', 'Complete handwritten house magazine drafted and bound on the spot.', 15, 10, 7, 'Upcoming', 'Main Stage', '09:00 AM', '09:00 AM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-12', 'RISALA QUIZ', 'Single', 'cat-general', 'On Stage', 30, '45 Mins', 'Comprehensive current affairs and literature quiz based on Risala editions.', 10, 7, 5, 'Upcoming', 'Main Stage', '04:00 PM', '04:00 PM', 10, '[{"id":"c1","name":"Subject Knowledge & Accuracy","maxScore":40},{"id":"c2","name":"Methodology & Clarity","maxScore":35},{"id":"c3","name":"Time & Delivery","maxScore":25}]', 'Draft', NULL),
-('comp-gen-13', 'COOKING', 'Group', 'cat-general', 'On Stage', 4, '60 Mins', 'Culinary skill, taste, hygiene, and authentic presentation competition.', 15, 10, 7, 'Upcoming', 'Main Stage', '03:00 PM', '03:00 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL),
-('comp-gen-14', 'CALLIGRAPHY', 'Single', 'cat-general', 'On Stage', 20, '90 Mins', 'Artistic Arabic and English traditional script and layout.', 10, 7, 5, 'Completed', 'Main Stage', '10:00 AM', '10:00 AM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Published', '2026-09-02T15:30:00Z'),
-('comp-gen-15', 'E-POSTER', 'Single', 'cat-general', 'On Stage', 20, '60 Mins', 'Digital graphic poster creation on festival theme using creative software.', 10, 7, 5, 'Upcoming', 'Main Stage', '02:00 PM', '02:00 PM', 10, '[{"id":"c1","name":"Composition & Theme Fit","maxScore":35},{"id":"c2","name":"Technique, Shading & Coloring","maxScore":35},{"id":"c3","name":"Neatness & Originality","maxScore":30}]', 'Draft', NULL),
-('comp-gen-16', 'ROUND TALK', 'Group', 'cat-general', 'On Stage', 6, '20 Mins', 'Roundtable moderated panel discussion on contemporary community issues.', 15, 10, 7, 'Upcoming', 'Main Stage', '04:30 PM', '04:30 PM', 10, '[{"id":"c1","name":"Synchronization & Harmony","maxScore":40},{"id":"c2","name":"Vocal/Action Quality","maxScore":35},{"id":"c3","name":"Presentation & Discipline","maxScore":25}]', 'Draft', NULL);
-
--- Students (44 total)
-INSERT INTO `students` (
-  `id`, `full_name`, `admission_no`, `chest_number`, `phone`, `team_id`, `category_id`,
-  `gender`, `role`, `photo`, `status`
-) VALUES
-('stu-310', 'MUHAMMED RAZI K', 'FRG-26-310', '310', '', 'team-1', 'cat-senior-on', 'Male', 'Leader', NULL, 'Active'),
-('stu-311', 'MUHAMMED RAZEEN MK', 'FRG-26-311', '311', '', 'team-1', 'cat-senior-on', 'Male', 'Sub-Leader', NULL, 'Active'),
-('stu-312', 'JUNAID M', 'FRG-26-312', '312', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-313', 'SWALIH PK', 'FRG-26-313', '313', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-314', 'JALAL VK', 'FRG-26-314', '314', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-315', 'SHAMIL PK', 'FRG-26-315', '315', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-316', 'ADHIL AMEEN K', 'FRG-26-316', '316', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-317', 'SUFAIR', 'FRG-26-317', '317', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-318', 'SAEED P', 'FRG-26-318', '318', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-319', 'ANSHID K', 'FRG-26-319', '319', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-320', 'ABDUL BASITH CK', 'FRG-26-320', '320', '', 'team-1', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-321', 'HISAN', 'FRG-26-321', '321', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-322', 'MINHAJ', 'FRG-26-322', '322', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-323', 'SAHAD', 'FRG-26-323', '323', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-324', 'AJMAL', 'FRG-26-324', '324', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-325', 'MUSTHAFA', 'FRG-26-325', '325', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-326', 'VOZAFAR', 'FRG-26-326', '326', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-327', 'SHIBILY', 'FRG-26-327', '327', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-328', 'NAJEEB', 'FRG-26-328', '328', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-329', 'ANSHIF', 'FRG-26-329', '329', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-330', 'YASEEN', 'FRG-26-330', '330', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-331', 'NIHAL', 'FRG-26-331', '331', '', 'team-1', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-410', 'YOONUS P', 'FRG-26-410', '410', '', 'team-2', 'cat-senior-on', 'Male', 'Leader', NULL, 'Active'),
-('stu-411', 'ZIYAD KUTHAR', 'FRG-26-411', '411', '', 'team-2', 'cat-senior-on', 'Male', 'Sub-Leader', NULL, 'Active'),
-('stu-412', 'ALTHAF K', 'FRG-26-412', '412', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-413', 'SHUHAIB O', 'FRG-26-413', '413', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-414', 'RAMEES K', 'FRG-26-414', '414', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-415', 'MUSTHAFA AP', 'FRG-26-415', '415', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-416', 'ALI M', 'FRG-26-416', '416', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-417', 'ADHIL P', 'FRG-26-417', '417', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-418', 'SUHAIL K', 'FRG-26-418', '418', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-419', 'SAVAD T', 'FRG-26-419', '419', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-420', 'NAFIH C', 'FRG-26-420', '420', '', 'team-2', 'cat-senior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-421', 'SHAHID', 'FRG-26-421', '421', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-422', 'ANEES', 'FRG-26-422', '422', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-423', 'SHAFI', 'FRG-26-423', '423', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-424', 'MIDLAJ', 'FRG-26-424', '424', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-425', 'THIM', 'FRG-26-425', '425', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-426', 'NASIH', 'FRG-26-426', '426', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-427', 'ANSHIF', 'FRG-26-427', '427', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-428', 'FASIL', 'FRG-26-428', '428', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-429', 'UNAIS', 'FRG-26-429', '429', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-430', 'AFLAH', 'FRG-26-430', '430', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active'),
-('stu-431', 'MISHAL', 'FRG-26-431', '431', '', 'team-2', 'cat-junior-on', 'Male', 'Member', NULL, 'Active');
-
--- Registrations (429 total)
-INSERT INTO `registrations` (`id`, `competition_id`, `student_id`, `code_letter`, `status`, `registered_at`) VALUES
-('reg-1', 'comp-sen-on-2', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-2', 'comp-sen-on-4', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-3', 'comp-sen-off-3', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-4', 'comp-sen-off-5', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-5', 'comp-sen-off-6', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-6', 'comp-sen-off-8', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-7', 'comp-sen-off-12', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-8', 'comp-sen-off-16', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-9', 'comp-sen-off-20', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-10', 'comp-gen-1', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-11', 'comp-gen-2', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-12', 'comp-gen-4', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-13', 'comp-gen-7', 'stu-310', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-14', 'comp-sen-on-4', 'stu-311', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-15', 'comp-sen-on-6', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-16', 'comp-sen-off-8', 'stu-311', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-17', 'comp-sen-off-11', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-18', 'comp-sen-off-15', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-19', 'comp-sen-off-19', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-20', 'comp-gen-1', 'stu-311', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-21', 'comp-gen-2', 'stu-311', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-22', 'comp-gen-4', 'stu-311', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-23', 'comp-gen-5', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-24', 'comp-gen-6', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-25', 'comp-gen-16', 'stu-311', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-26', 'comp-sen-on-1', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-27', 'comp-sen-on-5', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-28', 'comp-sen-on-7', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-29', 'comp-sen-on-8', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-30', 'comp-sen-off-4', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-31', 'comp-sen-off-7', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-32', 'comp-sen-off-9', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-33', 'comp-sen-off-11', 'stu-312', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-34', 'comp-sen-off-12', 'stu-312', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-35', 'comp-sen-off-14', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-36', 'comp-sen-off-16', 'stu-312', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-37', 'comp-gen-10', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-38', 'comp-gen-11', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-39', 'comp-gen-12', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-40', 'comp-gen-15', 'stu-312', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-41', 'comp-gen-16', 'stu-312', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-42', 'comp-sen-on-6', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-43', 'comp-sen-off-4', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-44', 'comp-sen-off-8', 'stu-313', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-45', 'comp-sen-off-19', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-46', 'comp-gen-1', 'stu-313', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-47', 'comp-gen-2', 'stu-313', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-48', 'comp-gen-4', 'stu-313', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-49', 'comp-gen-5', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-50', 'comp-gen-7', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-51', 'comp-gen-10', 'stu-313', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-52', 'comp-sen-on-2', 'stu-314', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-53', 'comp-sen-on-10', 'stu-314', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-54', 'comp-sen-off-5', 'stu-314', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-55', 'comp-sen-off-7', 'stu-314', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-56', 'comp-sen-off-10', 'stu-314', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-57', 'comp-sen-off-11', 'stu-314', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-58', 'comp-sen-off-13', 'stu-314', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-59', 'comp-sen-off-14', 'stu-314', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-60', 'comp-sen-off-16', 'stu-314', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-61', 'comp-gen-8', 'stu-314', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-62', 'comp-gen-10', 'stu-314', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-63', 'comp-gen-11', 'stu-314', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-64', 'comp-gen-14', 'stu-314', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-65', 'comp-sen-off-7', 'stu-315', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-66', 'comp-sen-off-12', 'stu-315', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-67', 'comp-sen-off-14', 'stu-315', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-68', 'comp-sen-off-15', 'stu-315', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-69', 'comp-gen-15', 'stu-315', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-70', 'comp-sen-on-3', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-71', 'comp-sen-on-7', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-72', 'comp-sen-on-8', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-73', 'comp-sen-on-9', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-74', 'comp-sen-off-2', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-75', 'comp-sen-off-6', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-76', 'comp-sen-off-9', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-77', 'comp-sen-off-11', 'stu-316', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-78', 'comp-sen-off-17', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-79', 'comp-sen-off-18', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-80', 'comp-sen-off-20', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-81', 'comp-gen-8', 'stu-316', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-82', 'comp-gen-9', 'stu-316', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-83', 'comp-gen-10', 'stu-316', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-84', 'comp-gen-11', 'stu-316', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-85', 'comp-sen-on-1', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-86', 'comp-sen-on-3', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-87', 'comp-sen-on-5', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-88', 'comp-sen-on-9', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-89', 'comp-sen-off-1', 'stu-317', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-90', 'comp-sen-off-3', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-91', 'comp-sen-off-11', 'stu-317', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-92', 'comp-sen-off-15', 'stu-317', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-93', 'comp-sen-off-17', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-94', 'comp-sen-off-18', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-95', 'comp-sen-off-21', 'stu-317', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-96', 'comp-gen-1', 'stu-317', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-97', 'comp-gen-2', 'stu-317', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-98', 'comp-gen-5', 'stu-317', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-99', 'comp-gen-7', 'stu-317', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-100', 'comp-gen-9', 'stu-317', 'B', 'Registered', '2026-09-03T08:00:00Z');
-INSERT INTO `registrations` (`id`, `competition_id`, `student_id`, `code_letter`, `status`, `registered_at`) VALUES
-('reg-101', 'comp-gen-10', 'stu-317', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-102', 'comp-gen-16', 'stu-317', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-103', 'comp-sen-off-1', 'stu-318', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-104', 'comp-sen-off-6', 'stu-318', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-105', 'comp-sen-off-2', 'stu-319', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-106', 'comp-sen-off-5', 'stu-319', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-107', 'comp-gen-4', 'stu-319', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-108', 'comp-gen-13', 'stu-319', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-109', 'comp-sen-on-1', 'stu-320', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-110', 'comp-sen-on-5', 'stu-320', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-111', 'comp-sen-on-10', 'stu-320', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-112', 'comp-sen-off-4', 'stu-320', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-113', 'comp-sen-off-10', 'stu-320', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-114', 'comp-sen-off-13', 'stu-320', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-115', 'comp-sen-off-22', 'stu-320', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-116', 'comp-gen-11', 'stu-320', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-117', 'comp-gen-15', 'stu-320', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-118', 'comp-gen-16', 'stu-320', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-119', 'comp-sen-on-4', 'stu-321', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-120', 'comp-jun-on-6', 'stu-321', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-121', 'comp-sen-on-8', 'stu-321', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-122', 'comp-sen-off-1', 'stu-321', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-123', 'comp-jun-off-2', 'stu-321', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-124', 'comp-jun-off-3', 'stu-321', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-125', 'comp-jun-off-17', 'stu-321', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-126', 'comp-sen-off-8', 'stu-321', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-127', 'comp-gen-1', 'stu-321', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-128', 'comp-gen-2', 'stu-321', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-129', 'comp-gen-3', 'stu-321', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-130', 'comp-sen-on-2', 'stu-322', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-131', 'comp-sen-on-3', 'stu-322', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-132', 'comp-sen-on-4', 'stu-322', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-133', 'comp-sen-on-8', 'stu-322', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-134', 'comp-sen-off-1', 'stu-322', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-135', 'comp-sen-off-4', 'stu-322', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-136', 'comp-sen-off-11', 'stu-322', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-137', 'comp-jun-off-13', 'stu-322', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-138', 'comp-jun-off-14', 'stu-322', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-139', 'comp-jun-off-24', 'stu-322', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-140', 'comp-sen-off-17', 'stu-322', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-141', 'comp-gen-3', 'stu-322', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-142', 'comp-gen-11', 'stu-322', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-143', 'comp-jun-on-7', 'stu-323', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-144', 'comp-sen-off-4', 'stu-323', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-145', 'comp-jun-off-6', 'stu-323', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-146', 'comp-sen-off-11', 'stu-323', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-147', 'comp-jun-off-13', 'stu-323', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-148', 'comp-sen-off-17', 'stu-323', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-149', 'comp-jun-off-16', 'stu-323', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-150', 'comp-jun-off-17', 'stu-323', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-151', 'comp-gen-12', 'stu-323', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-152', 'comp-gen-16', 'stu-323', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-153', 'comp-jun-on-5', 'stu-324', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-154', 'comp-jun-on-7', 'stu-324', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-155', 'comp-sen-off-9', 'stu-324', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-156', 'comp-sen-off-14', 'stu-324', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-157', 'comp-jun-off-24', 'stu-324', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-158', 'comp-jun-off-17', 'stu-324', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-159', 'comp-sen-off-8', 'stu-324', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-160', 'comp-jun-off-23', 'stu-324', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-161', 'comp-sen-on-1', 'stu-325', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-162', 'comp-sen-on-3', 'stu-325', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-163', 'comp-jun-on-9', 'stu-325', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-164', 'comp-jun-off-2', 'stu-325', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-165', 'comp-sen-off-5', 'stu-325', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-166', 'comp-jun-off-10', 'stu-325', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-167', 'comp-jun-off-24', 'stu-325', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-168', 'comp-jun-off-21', 'stu-325', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-169', 'comp-sen-off-8', 'stu-325', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-170', 'comp-jun-off-23', 'stu-325', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-171', 'comp-gen-3', 'stu-325', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-172', 'comp-sen-on-2', 'stu-326', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-173', 'comp-jun-on-9', 'stu-326', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-174', 'comp-sen-off-5', 'stu-326', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-175', 'comp-jun-off-10', 'stu-326', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-176', 'comp-jun-off-11', 'stu-326', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-177', 'comp-jun-off-16', 'stu-326', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-178', 'comp-jun-off-18', 'stu-326', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-179', 'comp-jun-off-20', 'stu-326', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-180', 'comp-jun-off-21', 'stu-326', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-181', 'comp-sen-on-1', 'stu-327', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-182', 'comp-sen-off-14', 'stu-327', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-183', 'comp-jun-off-9', 'stu-327', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-184', 'comp-jun-off-11', 'stu-327', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-185', 'comp-jun-off-13', 'stu-327', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-186', 'comp-jun-off-14', 'stu-327', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-187', 'comp-jun-off-18', 'stu-327', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-188', 'comp-sen-off-2', 'stu-327', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-189', 'comp-gen-14', 'stu-327', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-190', 'comp-sen-on-1', 'stu-328', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-191', 'comp-jun-on-9', 'stu-328', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-192', 'comp-jun-on-10', 'stu-328', 'A', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-193', 'comp-sen-off-4', 'stu-328', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-194', 'comp-sen-off-5', 'stu-328', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-195', 'comp-jun-off-6', 'stu-328', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-196', 'comp-jun-off-11', 'stu-328', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-197', 'comp-sen-off-11', 'stu-328', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-198', 'comp-jun-off-16', 'stu-328', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-199', 'comp-jun-off-20', 'stu-328', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-200', 'comp-jun-off-10', 'stu-329', 'C', 'Registered', '2026-09-03T08:00:00Z');
-INSERT INTO `registrations` (`id`, `competition_id`, `student_id`, `code_letter`, `status`, `registered_at`) VALUES
-('reg-201', 'comp-sen-off-11', 'stu-329', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-202', 'comp-jun-on-10', 'stu-330', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-203', 'comp-sen-off-14', 'stu-330', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-204', 'comp-jun-off-9', 'stu-330', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-205', 'comp-sen-off-11', 'stu-330', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-206', 'comp-jun-off-18', 'stu-330', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-207', 'comp-jun-on-5', 'stu-331', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-208', 'comp-jun-on-6', 'stu-331', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-209', 'comp-jun-off-3', 'stu-331', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-210', 'comp-jun-off-6', 'stu-331', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-211', 'comp-sen-off-2', 'stu-331', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-212', 'comp-jun-off-21', 'stu-331', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-213', 'comp-sen-off-9', 'stu-331', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-214', 'comp-gen-3', 'stu-331', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-215', 'comp-sen-on-5', 'stu-410', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-216', 'comp-sen-off-7', 'stu-410', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-217', 'comp-sen-off-11', 'stu-410', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-218', 'comp-sen-off-12', 'stu-410', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-219', 'comp-sen-off-13', 'stu-410', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-220', 'comp-sen-off-14', 'stu-410', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-221', 'comp-sen-off-16', 'stu-410', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-222', 'comp-sen-off-21', 'stu-410', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-223', 'comp-gen-10', 'stu-410', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-224', 'comp-gen-11', 'stu-410', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-225', 'comp-gen-14', 'stu-410', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-226', 'comp-gen-16', 'stu-410', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-227', 'comp-sen-on-2', 'stu-411', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-228', 'comp-sen-on-4', 'stu-411', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-229', 'comp-sen-on-6', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-230', 'comp-sen-on-10', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-231', 'comp-sen-off-2', 'stu-411', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-232', 'comp-sen-off-5', 'stu-411', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-233', 'comp-sen-off-10', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-234', 'comp-sen-off-17', 'stu-411', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-235', 'comp-sen-off-18', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-236', 'comp-sen-off-20', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-237', 'comp-sen-off-21', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-238', 'comp-gen-1', 'stu-411', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-239', 'comp-gen-2', 'stu-411', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-240', 'comp-gen-4', 'stu-411', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-241', 'comp-gen-5', 'stu-411', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-242', 'comp-gen-7', 'stu-411', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-243', 'comp-gen-8', 'stu-411', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-244', 'comp-gen-11', 'stu-411', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-245', 'comp-gen-16', 'stu-411', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-246', 'comp-sen-on-2', 'stu-412', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-247', 'comp-sen-on-1', 'stu-412', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-248', 'comp-sen-on-7', 'stu-412', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-249', 'comp-sen-on-10', 'stu-412', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-250', 'comp-sen-off-1', 'stu-412', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-251', 'comp-sen-off-3', 'stu-412', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-252', 'comp-sen-off-5', 'stu-412', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-253', 'comp-sen-off-8', 'stu-412', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-254', 'comp-sen-off-15', 'stu-412', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-255', 'comp-sen-off-17', 'stu-412', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-256', 'comp-sen-off-19', 'stu-412', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-257', 'comp-gen-1', 'stu-412', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-258', 'comp-gen-2', 'stu-412', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-259', 'comp-gen-4', 'stu-412', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-260', 'comp-gen-5', 'stu-412', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-261', 'comp-gen-6', 'stu-412', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-262', 'comp-gen-7', 'stu-412', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-263', 'comp-gen-8', 'stu-412', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-264', 'comp-gen-10', 'stu-412', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-265', 'comp-gen-11', 'stu-412', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-266', 'comp-gen-16', 'stu-412', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-267', 'comp-sen-on-3', 'stu-413', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-268', 'comp-sen-on-8', 'stu-413', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-269', 'comp-sen-on-7', 'stu-413', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-270', 'comp-sen-on-9', 'stu-413', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-271', 'comp-sen-off-1', 'stu-413', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-272', 'comp-sen-off-2', 'stu-413', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-273', 'comp-sen-off-3', 'stu-413', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-274', 'comp-sen-off-6', 'stu-413', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-275', 'comp-sen-off-11', 'stu-413', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-276', 'comp-sen-off-18', 'stu-413', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-277', 'comp-sen-off-19', 'stu-413', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-278', 'comp-gen-2', 'stu-413', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-279', 'comp-gen-4', 'stu-413', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-280', 'comp-gen-7', 'stu-413', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-281', 'comp-gen-9', 'stu-413', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-282', 'comp-gen-12', 'stu-413', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-283', 'comp-gen-13', 'stu-413', 'B', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-284', 'comp-sen-off-4', 'stu-414', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-285', 'comp-sen-off-5', 'stu-414', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-286', 'comp-sen-off-12', 'stu-414', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-287', 'comp-gen-10', 'stu-414', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-288', 'comp-gen-15', 'stu-414', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-289', 'comp-sen-on-1', 'stu-415', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-290', 'comp-sen-on-3', 'stu-415', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-291', 'comp-sen-on-9', 'stu-415', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-292', 'comp-sen-off-4', 'stu-415', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-293', 'comp-sen-off-6', 'stu-415', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-294', 'comp-sen-off-8', 'stu-415', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-295', 'comp-sen-off-10', 'stu-415', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-296', 'comp-sen-off-16', 'stu-415', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-297', 'comp-sen-off-18', 'stu-415', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-298', 'comp-sen-off-20', 'stu-415', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-299', 'comp-gen-9', 'stu-415', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-300', 'comp-gen-10', 'stu-415', 'I', 'Registered', '2026-09-03T08:00:00Z');
-INSERT INTO `registrations` (`id`, `competition_id`, `student_id`, `code_letter`, `status`, `registered_at`) VALUES
-('reg-301', 'comp-gen-11', 'stu-415', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-302', 'comp-gen-14', 'stu-415', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-303', 'comp-sen-off-16', 'stu-416', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-304', 'comp-gen-15', 'stu-416', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-305', 'comp-sen-on-4', 'stu-417', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-306', 'comp-sen-on-6', 'stu-417', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-307', 'comp-sen-off-7', 'stu-417', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-308', 'comp-sen-off-8', 'stu-417', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-309', 'comp-sen-off-9', 'stu-417', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-310', 'comp-sen-off-11', 'stu-417', 'M', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-311', 'comp-gen-1', 'stu-417', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-312', 'comp-gen-2', 'stu-417', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-313', 'comp-gen-4', 'stu-417', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-314', 'comp-gen-5', 'stu-417', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-315', 'comp-sen-on-5', 'stu-418', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-316', 'comp-sen-off-14', 'stu-418', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-317', 'comp-gen-15', 'stu-418', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-318', 'comp-sen-on-8', 'stu-419', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-319', 'comp-sen-off-7', 'stu-419', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-320', 'comp-sen-off-9', 'stu-419', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-321', 'comp-sen-off-11', 'stu-419', 'N', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-322', 'comp-sen-off-13', 'stu-419', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-323', 'comp-sen-off-14', 'stu-419', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-324', 'comp-sen-off-15', 'stu-419', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-325', 'comp-gen-10', 'stu-419', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-326', 'comp-gen-11', 'stu-419', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-327', 'comp-gen-12', 'stu-419', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-328', 'comp-gen-14', 'stu-419', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-329', 'comp-sen-on-1', 'stu-420', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-330', 'comp-sen-on-5', 'stu-420', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-331', 'comp-sen-off-4', 'stu-420', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-332', 'comp-sen-off-11', 'stu-420', 'O', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-333', 'comp-sen-off-12', 'stu-420', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-334', 'comp-sen-off-15', 'stu-420', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-335', 'comp-gen-16', 'stu-420', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-336', 'comp-sen-on-1', 'stu-421', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-337', 'comp-sen-on-3', 'stu-421', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-338', 'comp-sen-on-8', 'stu-421', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-339', 'comp-jun-on-9', 'stu-421', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-340', 'comp-sen-off-1', 'stu-421', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-341', 'comp-jun-off-2', 'stu-421', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-342', 'comp-jun-off-13', 'stu-421', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-343', 'comp-jun-off-24', 'stu-421', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-344', 'comp-jun-off-17', 'stu-421', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-345', 'comp-sen-off-8', 'stu-421', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-346', 'comp-jun-off-23', 'stu-421', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-347', 'comp-gen-1', 'stu-421', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-348', 'comp-gen-2', 'stu-421', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-349', 'comp-gen-3', 'stu-421', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-350', 'comp-gen-16', 'stu-421', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-351', 'comp-sen-on-3', 'stu-422', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-352', 'comp-jun-on-5', 'stu-422', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-353', 'comp-jun-on-7', 'stu-422', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-354', 'comp-jun-off-2', 'stu-422', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-355', 'comp-jun-off-3', 'stu-422', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-356', 'comp-sen-off-9', 'stu-422', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-357', 'comp-jun-off-13', 'stu-422', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-358', 'comp-jun-off-14', 'stu-422', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-359', 'comp-jun-off-24', 'stu-422', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-360', 'comp-jun-off-18', 'stu-422', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-361', 'comp-gen-3', 'stu-422', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-362', 'comp-sen-on-1', 'stu-423', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-363', 'comp-sen-on-2', 'stu-423', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-364', 'comp-jun-on-9', 'stu-423', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-365', 'comp-sen-off-1', 'stu-423', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-366', 'comp-sen-off-4', 'stu-423', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-367', 'comp-sen-off-5', 'stu-423', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-368', 'comp-sen-off-9', 'stu-423', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-369', 'comp-jun-off-10', 'stu-423', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-370', 'comp-sen-off-11', 'stu-423', 'P', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-371', 'comp-sen-off-17', 'stu-423', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-372', 'comp-jun-on-6', 'stu-424', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-373', 'comp-sen-off-4', 'stu-424', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-374', 'comp-jun-off-11', 'stu-424', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-375', 'comp-jun-off-14', 'stu-424', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-376', 'comp-jun-off-16', 'stu-424', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-377', 'comp-jun-off-17', 'stu-424', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-378', 'comp-jun-off-18', 'stu-424', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-379', 'comp-sen-off-8', 'stu-424', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-380', 'comp-sen-on-2', 'stu-425', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-381', 'comp-jun-on-9', 'stu-425', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-382', 'comp-sen-off-5', 'stu-425', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-383', 'comp-jun-off-10', 'stu-425', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-384', 'comp-sen-off-11', 'stu-425', 'Q', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-385', 'comp-jun-off-16', 'stu-425', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-386', 'comp-jun-off-18', 'stu-425', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-387', 'comp-jun-off-20', 'stu-425', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-388', 'comp-jun-on-10', 'stu-426', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-389', 'comp-jun-off-6', 'stu-426', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-390', 'comp-sen-off-11', 'stu-426', 'R', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-391', 'comp-jun-off-13', 'stu-426', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-392', 'comp-jun-off-21', 'stu-426', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-393', 'comp-sen-on-4', 'stu-427', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-394', 'comp-sen-off-4', 'stu-427', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-395', 'comp-jun-off-6', 'stu-427', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-396', 'comp-jun-off-11', 'stu-427', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-397', 'comp-sen-off-17', 'stu-427', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-398', 'comp-jun-off-16', 'stu-427', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-399', 'comp-jun-off-21', 'stu-427', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-400', 'comp-jun-off-23', 'stu-427', 'D', 'Registered', '2026-09-03T08:00:00Z');
-INSERT INTO `registrations` (`id`, `competition_id`, `student_id`, `code_letter`, `status`, `registered_at`) VALUES
-('reg-401', 'comp-gen-3', 'stu-427', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-402', 'comp-sen-on-4', 'stu-428', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-403', 'comp-jun-on-5', 'stu-428', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-404', 'comp-jun-on-6', 'stu-428', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-405', 'comp-sen-on-8', 'stu-428', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-406', 'comp-jun-off-3', 'stu-428', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-407', 'comp-sen-off-14', 'stu-428', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-408', 'comp-jun-off-11', 'stu-428', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-409', 'comp-jun-off-24', 'stu-428', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-410', 'comp-sen-off-2', 'stu-428', 'G', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-411', 'comp-jun-off-20', 'stu-428', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-412', 'comp-sen-off-17', 'stu-428', 'I', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-413', 'comp-gen-1', 'stu-428', 'J', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-414', 'comp-gen-3', 'stu-428', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-415', 'comp-jun-on-10', 'stu-429', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-416', 'comp-sen-off-5', 'stu-429', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-417', 'comp-jun-off-6', 'stu-429', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-418', 'comp-sen-off-14', 'stu-429', 'K', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-419', 'comp-jun-off-9', 'stu-429', 'C', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-420', 'comp-sen-off-11', 'stu-429', 'S', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-421', 'comp-jun-on-7', 'stu-430', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-422', 'comp-sen-off-14', 'stu-430', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-423', 'comp-jun-off-9', 'stu-430', 'D', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-424', 'comp-jun-off-17', 'stu-430', 'F', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-425', 'comp-sen-off-2', 'stu-430', 'H', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-426', 'comp-sen-off-8', 'stu-430', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-427', 'comp-sen-on-1', 'stu-431', 'L', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-428', 'comp-jun-off-9', 'stu-431', 'E', 'Registered', '2026-09-03T08:00:00Z'),
-('reg-429', 'comp-sen-off-11', 'stu-431', 'T', 'Registered', '2026-09-03T08:00:00Z');
-
--- Attendance
-INSERT INTO `attendance` (`id`, `competition_id`, `student_id`, `status`, `marked_at`) VALUES
-('att-1', 'comp-sen-on-1', 'stu-311', 'Present', '2026-09-03T09:00:00Z'),
-('att-2', 'comp-sen-on-1', 'stu-412', 'Present', '2026-09-03T09:00:00Z'),
-('att-3', 'comp-sen-off-4', 'stu-312', 'Present', '2026-09-03T10:00:00Z'),
-('att-4', 'comp-sen-off-4', 'stu-413', 'Present', '2026-09-03T10:00:00Z'),
-('att-5', 'comp-gen-14', 'stu-414', 'Present', '2026-09-03T11:00:00Z'),
-('att-6', 'comp-gen-14', 'stu-313', 'Present', '2026-09-03T11:00:00Z');
-
--- Judge Marks
-INSERT INTO `marks` (`id`, `competition_id`, `student_id`, `judge_name`, `scores`, `total_score`, `grade`, `max_score`, `feedback`, `submitted_at`) VALUES
-('jm-1', 'comp-sen-on-1', 'stu-311', 'Chief Judge', '{"sc-1":34,"sc-2":32,"sc-3":29}', 95, NULL, 100, 'Exceptional articulation, diction, and poised stage presence.', '2026-09-03T09:40:00Z'),
-('jm-2', 'comp-sen-on-1', 'stu-412', 'Chief Judge', '{"sc-1":32,"sc-2":31,"sc-3":28}', 91, NULL, 100, 'Commendable linguistic fluency and convincing arguments.', '2026-09-03T09:45:00Z');
-
--- Competition Results
-INSERT INTO `competition_results` (`id`, `competition_id`, `rankings`, `status`, `published_at`) VALUES
-('res-comp-sen-on-1', 'comp-sen-on-1', '[{"rank":1,"studentId":"stu-311","studentName":"MUHAMMED RAZEEN MK","chestNumber":"311","teamId":"team-1","teamName":"TEAM SELJUK","totalScore":95,"pointsAwarded":10},{"rank":2,"studentId":"stu-412","studentName":"ALTHAF K","chestNumber":"412","teamId":"team-2","teamName":"TEAM MAMLUK","totalScore":91,"pointsAwarded":7}]', 'Published', '2026-09-03T10:00:00Z'),
-('res-comp-sen-off-4', 'comp-sen-off-4', '[{"rank":1,"studentId":"stu-312","studentName":"JUNAID M","chestNumber":"312","teamId":"team-1","teamName":"TEAM SELJUK","totalScore":94,"pointsAwarded":10},{"rank":2,"studentId":"stu-413","studentName":"SHUHAIB O","chestNumber":"413","teamId":"team-2","teamName":"TEAM MAMLUK","totalScore":89,"pointsAwarded":7}]', 'Published', '2026-09-03T11:00:00Z'),
-('res-comp-gen-14', 'comp-gen-14', '[{"rank":1,"studentId":"stu-414","studentName":"RAMEES K","chestNumber":"414","teamId":"team-2","teamName":"TEAM MAMLUK","totalScore":96,"pointsAwarded":10},{"rank":2,"studentId":"stu-313","studentName":"SWALIH PK","chestNumber":"313","teamId":"team-1","teamName":"TEAM SELJUK","totalScore":90,"pointsAwarded":7}]', 'Published', '2026-09-03T12:00:00Z');
-
--- Schedule Items
-INSERT INTO `schedule_items` (`id`, `title`, `stage`, `date`, `time`, `status`, `category`, `competition_id`) VALUES
-('sch-1', 'Fragancia Grand Opening Ceremony & Du’a', 'Main Stage', '2026-09-03', '08:30 AM', 'Completed', 'General', NULL),
-('sch-2', 'ELOCUTION (MAL) (Senior On Stage)', 'Main Stage', '2026-09-03', '09:00 AM', 'Completed', 'Senior On Stage', 'comp-sen-on-1'),
-('sch-3', 'QIRATH (Senior On Stage)', 'Main Stage', '2026-09-03', '10:30 AM', 'Ongoing', 'Senior On Stage', 'comp-sen-on-8'),
-('sch-4', 'MAPPILAPPATT (Junior On Stage)', 'Main Stage', '2026-09-03', '11:30 AM', 'Upcoming', 'Junior On Stage', 'comp-jun-on-4'),
-('sch-5', 'QAVALI (General Mega Event)', 'Main Stage', '2026-09-03', '07:00 PM', 'Upcoming', 'General', 'comp-gen-1'),
-('sch-6', 'Grand Valedictory & Fragancia Champions Trophy', 'Main Stage', '2026-09-03', '09:30 PM', 'Upcoming', 'General', NULL);
-
--- Audit Logs
-INSERT INTO `audit_logs` (`id`, `action`, `details`, `user_email`, `timestamp`) VALUES
-('log-1', 'PORTAL_OPEN', 'Fragancia registration portal opened for all categories', 'admin@fragancia.local', '2026-09-01 08:00:00'),
-('log-2', 'RESULT_PUBLISHED', 'ELOCUTION (MAL) results published with medalist rankings', 'admin@fragancia.local', '2026-09-03 10:00:00'),
-('log-3', 'POINT_ADJUSTMENT', 'Awarded +5 points to TEAM SELJUK for exemplary pavilion discipline', 'admin@fragancia.local', '2026-09-03 12:00:00');
-
-SET FOREIGN_KEY_CHECKS = 1;
+-- ==============================================================================
+-- RESTORE ENVIRONMENT SETTINGS
+-- ==============================================================================
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+SET SQL_MODE=@OLD_SQL_MODE;

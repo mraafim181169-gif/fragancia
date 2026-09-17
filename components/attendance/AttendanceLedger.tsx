@@ -17,6 +17,7 @@ import { Badge } from '../ui/Badge';
 
 export function AttendanceLedger() {
   const store = useFestStore();
+  const session = store.getSession();
   const competitions = store.getCompetitions();
   const registrations = store.getRegistrations();
   const attendanceList = store.getAttendance();
@@ -31,12 +32,14 @@ export function AttendanceLedger() {
 
   // Toggle attendance using store.markAttendance(comp.id, studentId, chestNumber, status)
   const handleToggleAttendance = (studentId: string, chestNumber: string, currentStatus?: AttendanceStatus) => {
+    if (session.role !== 'ADMIN') return;
     if (!selectedCompId) return;
     const nextStatus: AttendanceStatus = currentStatus === 'Present' ? 'Absent' : 'Present';
     store.markAttendance(selectedCompId, studentId, chestNumber, nextStatus);
   };
 
   const handleMarkAll = (status: AttendanceStatus) => {
+    if (session.role !== 'ADMIN') return;
     if (!selectedCompId) return;
     const studentIds = compRegs.map((r) => r.studentId);
     store.bulkMarkAttendance(selectedCompId, studentIds, status);
@@ -69,15 +72,17 @@ export function AttendanceLedger() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleMarkAll('Present')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 cursor-pointer"
-          >
-            <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Mark All Present</span>
-          </button>
-        </div>
+        {session.role === 'ADMIN' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleMarkAll('Present')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 cursor-pointer"
+            >
+              <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Mark All Present</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Select Competition Bar */}
@@ -125,22 +130,24 @@ export function AttendanceLedger() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleMarkAll('Present')}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold cursor-pointer transition-colors"
-          >
-            <CheckCheck className="w-3.5 h-3.5" />
-            <span>All Present</span>
-          </button>
-          <button
-            onClick={() => handleMarkAll('Absent')}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/60 text-red-800 dark:text-red-300 text-xs font-semibold cursor-pointer transition-colors"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            <span>All Absent</span>
-          </button>
-        </div>
+        {session.role === 'ADMIN' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleMarkAll('Present')}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold cursor-pointer transition-colors"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              <span>All Present</span>
+            </button>
+            <button
+              onClick={() => handleMarkAll('Absent')}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/60 text-red-800 dark:text-red-300 text-xs font-semibold cursor-pointer transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>All Absent</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Roll Call Cards Grid */}
@@ -159,8 +166,10 @@ export function AttendanceLedger() {
             return (
               <div
                 key={reg.id}
-                onClick={() => handleToggleAttendance(reg.studentId, reg.chestNumber, att?.status)}
-                className={`p-4 sm:p-5 rounded-[22px] sm:rounded-[24px] border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                onClick={session.role === 'ADMIN' ? () => handleToggleAttendance(reg.studentId, reg.chestNumber, att?.status) : undefined}
+                className={`p-4 sm:p-5 rounded-[22px] sm:rounded-[24px] border transition-all select-none flex items-center justify-between gap-3 ${
+                  session.role === 'ADMIN' ? 'cursor-pointer' : 'cursor-default'
+                } ${
                   isPresent
                     ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60 shadow-xs'
                     : 'bg-white dark:bg-[#121212] border-black/10 dark:border-white/10 opacity-75 hover:opacity-100'

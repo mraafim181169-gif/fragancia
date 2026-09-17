@@ -451,14 +451,24 @@ export function StudentManager({
                       </td>
                       <td className="py-3.5 px-5 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openAssignModal(student)}
-                            title={`Assign Programmes (${assignedCount}/${maxAllowed})`}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 transition-colors cursor-pointer text-xs font-mono font-bold"
-                          >
-                            <ListPlus className="w-4 h-4" />
-                            <span>{assignedCount}/{maxAllowed}</span>
-                          </button>
+                          {session.role === 'ADMIN' ? (
+                            <button
+                              onClick={() => openAssignModal(student)}
+                              title={`Assign Programmes (${assignedCount}/${maxAllowed})`}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 transition-colors cursor-pointer text-xs font-mono font-bold"
+                            >
+                              <ListPlus className="w-4 h-4" />
+                              <span>{assignedCount}/{maxAllowed}</span>
+                            </button>
+                          ) : (
+                            <span
+                              title={`Assigned Programmes: ${assignedCount}/${maxAllowed}`}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-500 text-xs font-mono font-medium"
+                            >
+                              <ListPlus className="w-4 h-4" />
+                              <span>{assignedCount}/{maxAllowed}</span>
+                            </span>
+                          )}
                           <button
                             onClick={() => setProfileStudent(student)}
                             title="View Student Dossier"
@@ -563,12 +573,14 @@ export function StudentManager({
                     >
                       <Eye className="w-3.5 h-3.5" /> Profile
                     </button>
-                    <button
-                      onClick={() => openAssignModal(student)}
-                      className="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ListPlus className="w-3.5 h-3.5" /> Assign ({assignedCount}/{maxAllowed})
-                    </button>
+                    {session.role === 'ADMIN' && (
+                      <button
+                        onClick={() => openAssignModal(student)}
+                        className="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <ListPlus className="w-3.5 h-3.5" /> Assign ({assignedCount}/{maxAllowed})
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">

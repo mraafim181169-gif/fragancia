@@ -31,6 +31,8 @@ type SettingsTab = 'branding' | 'hero' | 'sections' | 'scoring' | 'portal' | 'fo
 
 export function SettingsManager() {
   const store = useFestStore();
+  const session = store.getSession();
+  const isAdmin = session.role === 'ADMIN';
   const currentSettings = store.getSettings();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('branding');
@@ -88,6 +90,7 @@ export function SettingsManager() {
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!isAdmin) return;
 
     const updated: Partial<EventSettings> = {
       // Branding
@@ -142,6 +145,7 @@ export function SettingsManager() {
   };
 
   const handleResetToCleanState = () => {
+    if (!isAdmin) return;
     if (
       window.confirm(
         'Reset all settings, texts, and student rosters back to default Fragancia state?'
@@ -188,6 +192,7 @@ export function SettingsManager() {
   };
 
   const handleClearAllContent = () => {
+    if (!isAdmin) return;
     if (
       window.confirm(
         '⚠️ Are you sure you want to remove ALL content? This will purge all students, registrations, and published results so you can start completely fresh. This action cannot be undone.'
@@ -231,20 +236,28 @@ export function SettingsManager() {
 
         {/* Global Save Button */}
         <div className="flex items-center gap-2.5">
-          {hasUnsavedChanges && (
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 animate-pulse hidden sm:inline">
-              ● Unsaved edits
+          {isAdmin ? (
+            <>
+              {hasUnsavedChanges && (
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 animate-pulse hidden sm:inline">
+                  ● Unsaved edits
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSave()}
+                className="flex items-center gap-2 px-6 py-3 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"
+                id="save-all-settings-btn"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save All Changes</span>
+              </button>
+            </>
+          ) : (
+            <span className="px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-semibold text-neutral-500 font-mono">
+              View-Only (Admin role required to edit)
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => handleSave()}
-            className="flex items-center gap-2 px-6 py-3 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"
-            id="save-all-settings-btn"
-          >
-            <Save className="w-4 h-4" />
-            <span>Save All Changes</span>
-          </button>
         </div>
       </div>
 
@@ -286,7 +299,8 @@ export function SettingsManager() {
 
       {/* Main Settings Body */}
       <form onSubmit={handleSave} className="space-y-6">
-        {/* TAB 1: BRANDING & GENERAL */}
+        <fieldset disabled={!isAdmin} className="space-y-6 border-0 p-0 m-0">
+          {/* TAB 1: BRANDING & GENERAL */}
         {activeTab === 'branding' && (
           <div className="p-6 sm:p-8 rounded-[32px] bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 shadow-xs space-y-6">
             <div className="border-b border-black/5 dark:border-white/5 pb-4">
@@ -985,55 +999,67 @@ export function SettingsManager() {
           </div>
         )}
 
+        </fieldset>
+
         {/* Floating / Sticky Save Bar */}
         <div className="p-4 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-2 text-xs">
             <Info className="w-4 h-4 opacity-70" />
-            <span>Changes made in any tab will be applied together when you click Save.</span>
+            <span>
+              {isAdmin
+                ? 'Changes made in any tab will be applied together when you click Save.'
+                : 'You are currently viewing settings in read-only mode. Switch to Admin role with PIN 18169 to make changes.'}
+            </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => handleSave()}
-            className="flex items-center gap-2 px-5 py-2 rounded-full bg-white text-neutral-950 dark:bg-neutral-950 dark:text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>Save Settings</span>
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              className="flex items-center gap-2 px-5 py-2 rounded-full bg-white text-neutral-950 dark:bg-neutral-950 dark:text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Settings</span>
+            </button>
+          ) : (
+            <span className="text-xs font-mono font-bold opacity-60">Read-Only</span>
+          )}
         </div>
       </form>
 
       {/* Danger Zone / Environment Reset & Content Purge */}
-      <div className="p-6 rounded-[32px] bg-red-50/40 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 space-y-4">
-        <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-sm uppercase font-mono">
-          <ShieldAlert className="w-4 h-4" />
-          <span>Danger Zone: Content Purge & Environment Reset</span>
+      {isAdmin && (
+        <div className="p-6 rounded-[32px] bg-red-50/40 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 space-y-4">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-sm uppercase font-mono">
+            <ShieldAlert className="w-4 h-4" />
+            <span>Danger Zone: Content Purge & Environment Reset</span>
+          </div>
+
+          <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            Purge all contents (registered students, entries, and published results) to begin a fresh fest event, or restore the default Fragancia demo roster.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleClearAllContent}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove All Content</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetToCleanState}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset to Clean Fragancia Demo</span>
+            </button>
+          </div>
         </div>
-
-        <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-          Purge all contents (registered students, entries, and published results) to begin a fresh fest event, or restore the default Fragancia demo roster.
-        </p>
-
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <button
-            type="button"
-            onClick={handleClearAllContent}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer shadow-xs"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Remove All Content</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleResetToCleanState}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-bold hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset to Clean Fragancia Demo</span>
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

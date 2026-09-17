@@ -155,6 +155,7 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
   };
 
   const handleDeleteMark = (markIdToDelete?: string, codeLetterForMsg?: string) => {
+    if (session.role !== 'ADMIN') return;
     const targetId = markIdToDelete || existingMark?.id;
     if (!targetId) return;
 
@@ -336,17 +337,19 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMark(markRecord.id, codeLetter);
-                              }}
-                              title="Delete Mark"
-                              className="p-1 rounded-md bg-red-50 dark:bg-red-950/50 text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {session.role === 'ADMIN' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMark(markRecord.id, codeLetter);
+                                }}
+                                title="Delete Mark"
+                                className="p-1 rounded-md bg-red-50 dark:bg-red-950/50 text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -510,7 +513,7 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                 {/* Action Buttons: Delete, Reset, Update/Save */}
                 <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-black/5 dark:border-white/5">
                   <div>
-                    {existingMark && (
+                    {existingMark && session.role === 'ADMIN' && (
                       <button
                         type="button"
                         onClick={() => handleDeleteMark(existingMark.id, activeCodeLetter)}
@@ -599,23 +602,25 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const targetMark = marks.find(
-                              (m) =>
-                                m.competitionId === selectedCompId &&
-                                m.studentId === rk.studentId
-                            );
-                            if (targetMark) {
-                              handleDeleteMark(targetMark.id, rk.codeLetter);
-                            }
-                          }}
-                          title="Delete this participant score"
-                          className="p-1 rounded-md bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        {session.role === 'ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetMark = marks.find(
+                                (m) =>
+                                  m.competitionId === selectedCompId &&
+                                  m.studentId === rk.studentId
+                              );
+                              if (targetMark) {
+                                handleDeleteMark(targetMark.id, rk.codeLetter);
+                              }
+                            }}
+                            title="Delete this participant score"
+                            className="p-1 rounded-md bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

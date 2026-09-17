@@ -4,23 +4,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Bell,
   Menu,
-  Sparkles,
-  LayoutDashboard,
-  Calendar,
-  Trophy,
-  ClipboardList,
-  Scale,
-  Award,
-  Users,
-  Shield,
-  FileText,
-  Settings,
-  UserCheck,
-  Layers,
 } from 'lucide-react';
 import { useFestStore } from '@/hooks/useFestStore';
 import { NavTab } from './Sidebar';
-import { Badge } from '@/components/ui/Badge';
 
 interface TopBarProps {
   currentTab: NavTab;
@@ -40,7 +26,6 @@ export function TopBar({
   const session = store.getSession();
   const settings = store.getSettings();
   const auditLogs = store.getAuditLogs();
-  const isDarkMode = settings.themeMode === 'dark';
 
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -62,42 +47,28 @@ export function TopBar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navItems: { id: NavTab; label: string; icon: React.ElementType; badge?: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'competitions', label: 'Competitions', icon: Trophy },
-    { id: 'registrations', label: 'Registrations', icon: ClipboardList },
-    { id: 'judging', label: 'Judge Panel', icon: Scale, badge: 'Blind' },
-    { id: 'scoreboard', label: 'Scoreboard', icon: Award, badge: 'Live' },
-    { id: 'attendance', label: 'Attendance', icon: UserCheck },
-    { id: 'teams', label: 'Teams', icon: Shield },
-    { id: 'students', label: 'Students', icon: Users },
-    { id: 'categories', label: 'Categories', icon: Layers },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
-
   return (
-    <header className="sticky top-0 z-40 bg-[#F7F7F5]/95 dark:bg-[#080808]/95 backdrop-blur-xl border-b border-black/10 dark:border-white/10 px-2 sm:px-6 py-2 transition-all no-print shadow-xs">
-      <div className="flex items-center justify-between gap-1.5 sm:gap-4 max-w-7xl mx-auto w-full">
-        {/* Left: Mobile Drawer Trigger & Desktop Fest Name (Hidden on mobile) */}
-        <div className="flex items-center gap-2 shrink-0">
+    <header className="sticky top-0 z-40 bg-[#F7F7F5]/95 dark:bg-[#080808]/95 backdrop-blur-xl border-b border-black/10 dark:border-white/10 px-4 sm:px-6 py-3 transition-all no-print shadow-xs">
+      <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto w-full">
+        {/* Left: Menu Bar Trigger & Fest Brand */}
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 rounded-xl bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+            className="flex items-center gap-2 p-2 sm:px-3 sm:py-2 rounded-xl bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-xs"
             aria-label="Open navigation menu"
-            id="mobile-nav-toggle-btn"
+            id="nav-menu-bar-btn"
+            title="Open Navigation Menu"
           >
             <Menu className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider hidden xs:inline">Menu</span>
           </button>
 
-          {/* Fest Name: Hidden on mobile (<640px) as requested */}
           <div
             onClick={() => onNavigate('dashboard')}
-            className="hidden sm:flex flex-col cursor-pointer select-none group"
+            className="flex flex-col cursor-pointer select-none group"
             title="Go to Fest Dashboard"
           >
-            <h1 className="text-sm sm:text-base font-black tracking-tight text-neutral-950 dark:text-white uppercase leading-none truncate max-w-[160px] xs:max-w-[200px] sm:max-w-[260px]">
+            <h1 className="text-sm sm:text-base font-black tracking-tight text-neutral-950 dark:text-white uppercase leading-none truncate">
               {settings.eventName || 'FRAGANCIA 2026'}
             </h1>
             <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold block mt-0.5">
@@ -106,48 +77,18 @@ export function TopBar({
           </div>
         </div>
 
-        {/* Center: Mobile Responsive Navigation Bars */}
-        <nav className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none py-1 px-1 mx-1 sm:mx-2 max-w-full">
-          {navItems.map((item) => {
-            const isActive = currentTab === item.id;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-                  isActive
-                    ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span>{item.label}</span>
-                {item.badge && (
-                  <span
-                    className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono uppercase font-black ${
-                      isActive
-                        ? 'bg-amber-400 text-black'
-                        : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Center: Clean whitespace (all tabs moved to the menu bar as requested) */}
+        <div className="flex-1" />
 
-        {/* Right: Notifications Bell */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Notifications Bell */}
+        {/* Right: Only Notification Option */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               aria-label="Activity Notifications"
-              className="p-2 rounded-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-all relative cursor-pointer shadow-xs"
+              className="p-2.5 rounded-full bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-all relative cursor-pointer shadow-xs"
               id="notifications-btn"
+              title="Notifications"
             >
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-600 animate-pulse ring-2 ring-white dark:ring-neutral-900" />

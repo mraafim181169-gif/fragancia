@@ -11,6 +11,7 @@ import {
   EyeOff,
   Printer,
   Sparkles,
+  Calendar,
 } from 'lucide-react';
 import { NavTab } from '../layout/Sidebar';
 import { Badge } from '../ui/Badge';
@@ -23,24 +24,34 @@ interface BlackFeatureSectionProps {
 export function BlackFeatureSection({ onNavigate }: BlackFeatureSectionProps) {
   const store = useFestStore();
   const settings = store.getSettings();
+  const session = store.getSession();
 
   const features = [
     {
       id: 'reg',
       title: 'Registration & Chest Cards',
       description: 'Zero-collision unique chest numbers (AF-001) with 1-click printable chest cards & badges.',
-      tab: 'students' as NavTab,
+      tab: (session.role === 'ADMIN' ? 'students' : 'competitions') as NavTab,
       icon: ClipboardCheck,
       tag: 'AUTOMATED',
     },
-    {
-      id: 'judge',
-      title: 'Blind Code Judging',
-      description: 'Judges evaluate purely by participant chest codes without bias or student identities revealed.',
-      tab: 'judging' as NavTab,
-      icon: EyeOff,
-      tag: 'ANONYMOUS',
-    },
+    session.role === 'ADMIN'
+      ? {
+          id: 'judge',
+          title: 'Blind Code Judging',
+          description: 'Judges evaluate purely by participant chest codes without bias or student identities revealed.',
+          tab: 'judging' as NavTab,
+          icon: EyeOff,
+          tag: 'ANONYMOUS',
+        }
+      : {
+          id: 'schedule',
+          title: 'Live Stage Timeline',
+          description: 'Follow ongoing stages, track venue timings, and see upcoming events in real time.',
+          tab: 'schedule' as NavTab,
+          icon: Calendar,
+          tag: 'SCHEDULE',
+        },
     {
       id: 'results',
       title: 'Dynamic Result Engine',

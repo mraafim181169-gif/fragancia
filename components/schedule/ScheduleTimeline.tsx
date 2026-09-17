@@ -89,6 +89,7 @@ export function ScheduleTimeline({
   };
 
   const handleStatusChange = (comp: Competition, newStatus: CompetitionStatus) => {
+    if (session.role !== 'ADMIN') return;
     store.updateCompetition(comp.id, { status: newStatus });
   };
 
@@ -447,7 +448,7 @@ export function ScheduleTimeline({
                     </button>
 
                     <div className="flex items-center gap-2">
-                      {onNavigateToJudging && (
+                      {onNavigateToJudging && session.role !== 'VIEWER' && (
                         <button
                           onClick={() => onNavigateToJudging(comp)}
                           className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"

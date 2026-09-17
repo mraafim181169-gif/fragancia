@@ -87,6 +87,11 @@ export function RegistrationManager() {
     e.preventDefault();
     setErrorMessage('');
 
+    if (session.role !== 'ADMIN') {
+      setErrorMessage('Only administrators can register students.');
+      return;
+    }
+
     if (!isPortalOpen && session.role !== 'ADMIN') {
       setErrorMessage('Registration portal is currently CLOSED. Only administrators can bypass.');
       return;
@@ -114,6 +119,7 @@ export function RegistrationManager() {
   };
 
   const handleSaveInlineLetter = (regId: string) => {
+    if (session.role !== 'ADMIN') return;
     if (editingLetterVal.trim()) {
       store.updateRegistrationCodeLetter(regId, editingLetterVal.trim().toUpperCase());
     }
@@ -121,6 +127,7 @@ export function RegistrationManager() {
   };
 
   const handleAutoAssignLetters = () => {
+    if (session.role !== 'ADMIN') return;
     if (selectedCompId === 'ALL') {
       alert('Please select a specific programme from the filter dropdown first to assign code letters.');
       return;
@@ -129,6 +136,7 @@ export function RegistrationManager() {
   };
 
   const handleDeleteRegistration = (reg: Registration) => {
+    if (session.role !== 'ADMIN') return;
     if (
       window.confirm(
         `Cancel registration of ${reg.studentName} (${reg.chestNumber}) for ${reg.competitionName}?`
@@ -177,32 +185,36 @@ export function RegistrationManager() {
             <span>PORTAL {settings.portalStatus}</span>
           </div>
 
-          {selectedCompId !== 'ALL' && (
-            <button
-              onClick={handleAutoAssignLetters}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer"
-              title="Automatically assign sequential Code Letters (A, B, C...) to all participants in this programme"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-              <span>Auto-Assign Letters (A, B, C...)</span>
-            </button>
+          {session.role === 'ADMIN' && (
+            <>
+              {selectedCompId !== 'ALL' && (
+                <button
+                  onClick={handleAutoAssignLetters}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer"
+                  title="Automatically assign sequential Code Letters (A, B, C...) to all participants in this programme"
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>Auto-Assign Letters (A, B, C...)</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setIsAssignModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <ListPlus className="w-4 h-4" />
+                <span>Assign by Participant</span>
+              </button>
+
+              <button
+                onClick={handleOpenEnrollModal}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Entry</span>
+              </button>
+            </>
           )}
-
-          <button
-            onClick={() => setIsAssignModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            <ListPlus className="w-4 h-4" />
-            <span>Assign by Participant</span>
-          </button>
-
-          <button
-            onClick={handleOpenEnrollModal}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Register Entry</span>
-          </button>
         </div>
       </div>
 
@@ -310,36 +322,42 @@ export function RegistrationManager() {
                     className="hover:bg-neutral-50/60 dark:hover:bg-neutral-900/40 transition-colors"
                   >
                     <td className="py-3.5 px-5">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="text"
-                            maxLength={4}
-                            value={editingLetterVal}
-                            onChange={(e) => setEditingLetterVal(e.target.value.toUpperCase())}
-                            className="w-12 px-2 py-1 text-center font-mono font-black text-xs rounded-lg bg-amber-100 dark:bg-amber-950 border border-amber-400 focus:outline-none uppercase"
-                            autoFocus
-                          />
+                      {session.role === 'ADMIN' ? (
+                        isEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              maxLength={4}
+                              value={editingLetterVal}
+                              onChange={(e) => setEditingLetterVal(e.target.value.toUpperCase())}
+                              className="w-12 px-2 py-1 text-center font-mono font-black text-xs rounded-lg bg-amber-100 dark:bg-amber-950 border border-amber-400 focus:outline-none uppercase"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveInlineLetter(reg.id)}
+                              className="p-1 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                              title="Save"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => handleSaveInlineLetter(reg.id)}
-                            className="p-1 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                            title="Save"
+                            onClick={() => {
+                              setEditingRegId(reg.id);
+                              setEditingLetterVal(currentLetter);
+                            }}
+                            className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 font-mono font-black text-xs hover:bg-amber-500/25 transition-all cursor-pointer"
+                            title="Click to edit participant's Code Letter"
                           >
-                            <Check className="w-3 h-3" />
+                            <span>Code {currentLetter}</span>
+                            <Edit2 className="w-3 h-3 opacity-40 group-hover:opacity-100" />
                           </button>
-                        </div>
+                        )
                       ) : (
-                        <button
-                          onClick={() => {
-                            setEditingRegId(reg.id);
-                            setEditingLetterVal(currentLetter);
-                          }}
-                          className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 font-mono font-black text-xs hover:bg-amber-500/25 transition-all cursor-pointer"
-                          title="Click to edit participant's Code Letter"
-                        >
-                          <span>Code {currentLetter}</span>
-                          <Edit2 className="w-3 h-3 opacity-40 group-hover:opacity-100" />
-                        </button>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 font-mono font-black text-xs">
+                          Code {currentLetter}
+                        </span>
                       )}
                     </td>
                     <td className="py-3.5 px-4">
@@ -368,13 +386,15 @@ export function RegistrationManager() {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-5 text-right">
-                      <button
-                        onClick={() => handleDeleteRegistration(reg)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition-colors cursor-pointer"
-                        title="Cancel Registration"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {session.role === 'ADMIN' && (
+                        <button
+                          onClick={() => handleDeleteRegistration(reg)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition-colors cursor-pointer"
+                          title="Cancel Registration"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

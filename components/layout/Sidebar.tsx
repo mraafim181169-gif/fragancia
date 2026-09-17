@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -19,11 +19,16 @@ import {
   LogOut,
   RotateCcw,
   Sparkles,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { store } from '@/lib/store';
 import { useFestStore } from '@/hooks/useFestStore';
 import { Role } from '@/types/fest';
+import { Modal } from '@/components/ui/Modal';
 
 export type NavTab =
   | 'dashboard'
@@ -60,18 +65,26 @@ export function Sidebar({
   const session = festStore.getSession();
   const isDarkMode = settings.themeMode === 'dark';
 
+  // Admin password modal states
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminPasswordError, setAdminPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Restricted navigation items:
+  // For VIEWER role: judge panel, attendance, registrations, reports, settings are strictly hidden.
   const navItems: { id: NavTab; label: string; icon: React.ElementType; badge?: string; allowedRoles?: Role[] }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Students', icon: Users },
-    { id: 'teams', label: 'Teams', icon: Shield },
-    { id: 'categories', label: 'Categories', icon: Layers },
-    { id: 'competitions', label: 'Competitions', icon: Trophy },
-    { id: 'registrations', label: 'Registrations', icon: ClipboardList },
-    { id: 'attendance', label: 'Attendance', icon: UserCheck },
-    { id: 'judging', label: 'Judge Panel', icon: Scale, badge: 'Blind Code' },
     { id: 'scoreboard', label: 'Scoreboard', icon: Award, badge: 'Live' },
     { id: 'schedule', label: 'Programme', icon: Calendar },
-    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'competitions', label: 'Competitions', icon: Trophy },
+    { id: 'teams', label: 'Teams', icon: Shield },
+    { id: 'students', label: 'Students', icon: Users },
+    { id: 'categories', label: 'Categories', icon: Layers },
+    { id: 'judging', label: 'Judge Panel', icon: Scale, badge: 'Blind Code', allowedRoles: ['ADMIN', 'JUDGE'] },
+    { id: 'attendance', label: 'Attendance', icon: UserCheck, allowedRoles: ['ADMIN'] },
+    { id: 'registrations', label: 'Registrations', icon: ClipboardList, allowedRoles: ['ADMIN'] },
+    { id: 'reports', label: 'Reports', icon: FileText, allowedRoles: ['ADMIN'] },
     { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['ADMIN'] },
   ];
 
@@ -87,17 +100,40 @@ export function Sidebar({
   };
 
   const handleRoleChange = (role: Role) => {
+    if (role === 'ADMIN') {
+      if (session.role === 'ADMIN') return; // already admin
+      setAdminPasswordInput('');
+      setAdminPasswordError('');
+      setIsAdminAuthModalOpen(true);
+      return;
+    }
+
     festStore.setSession({
       id: `usr-${role.toLowerCase()}`,
       name:
-        role === 'ADMIN'
-          ? 'Fest Director (Admin)'
-          : role === 'JUDGE'
+        role === 'JUDGE'
           ? 'Usthad Qari (Judge)'
           : 'Public Guest (Viewer)',
       email: `${role.toLowerCase()}@fragancia.local`,
       role,
     });
+  };
+
+  const handleAdminAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPasswordInput.trim() === '18169') {
+      festStore.setSession({
+        id: 'usr-admin',
+        name: 'Fest Director (Admin)',
+        email: 'admin@fragancia.local',
+        role: 'ADMIN',
+      });
+      setIsAdminAuthModalOpen(false);
+      setAdminPasswordInput('');
+      setAdminPasswordError('');
+    } else {
+      setAdminPasswordError('Invalid password! Admin password is 18169.');
+    }
   };
 
   return (
@@ -246,15 +282,90 @@ export function Sidebar({
             </div>
           </div>
 
-          <button
-            onClick={() => festStore.resetToDemoData()}
-            title="Reset to Pristine Demo Data"
-            className="p-1 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          {session.role === 'ADMIN' && (
+            <button
+              onClick={() => festStore.resetToDemoData()}
+              title="Reset to Pristine Demo Data"
+              className="p-1 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Admin Password Authentication Modal */}
+      {isAdminAuthModalOpen && (
+        <Modal
+          isOpen={isAdminAuthModalOpen}
+          onClose={() => {
+            setIsAdminAuthModalOpen(false);
+            setAdminPasswordInput('');
+            setAdminPasswordError('');
+          }}
+          title="Admin Verification"
+          subtitle="Enter master administrator PIN to unlock management permissions."
+          maxWidth="sm"
+        >
+          <form onSubmit={handleAdminAuthSubmit} className="space-y-4 pt-1">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
+                  Master Admin Password
+                </label>
+                <span className="text-[10px] font-mono text-neutral-400">
+                  PIN: 18169
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminPasswordInput}
+                  onChange={(e) => {
+                    setAdminPasswordInput(e.target.value);
+                    setAdminPasswordError('');
+                  }}
+                  placeholder="Enter admin password (18169)..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white pr-10"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {adminPasswordError && (
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 font-medium">
+                  {adminPasswordError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminAuthModalOpen(false);
+                  setAdminPasswordInput('');
+                  setAdminPasswordError('');
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm"
+              >
+                Authenticate
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </aside>
   );
 }

@@ -10,6 +10,7 @@ import {
   ToggleRight,
   TrendingUp,
   CheckCircle2,
+  Calendar,
 } from 'lucide-react';
 import { useFestStore } from '@/hooks/useFestStore';
 import { NavTab } from '../layout/Sidebar';
@@ -29,9 +30,11 @@ export function MetricsGrid({ onNavigate }: MetricsGridProps) {
   const competitions = store.getCompetitions();
   const registrations = store.getRegistrations();
   const teams = store.getTeams();
+  const schedule = store.getSchedule();
 
   const handleTogglePortal = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (session.role !== 'ADMIN') return;
     store.togglePortalStatus();
   };
 
@@ -44,14 +47,23 @@ export function MetricsGrid({ onNavigate }: MetricsGridProps) {
       icon: Users,
       tab: 'students' as NavTab,
     },
-    {
-      id: 'registrations',
-      label: 'REGISTRATIONS',
-      count: registrations.length,
-      detail: `${registrations.filter((r) => r.status === 'Registered').length} Confirmed Slots`,
-      icon: ClipboardList,
-      tab: 'registrations' as NavTab,
-    },
+    session.role === 'ADMIN'
+      ? {
+          id: 'registrations',
+          label: 'REGISTRATIONS',
+          count: registrations.length,
+          detail: `${registrations.filter((r) => r.status === 'Registered').length} Confirmed Slots`,
+          icon: ClipboardList,
+          tab: 'registrations' as NavTab,
+        }
+      : {
+          id: 'schedule',
+          label: 'SCHEDULE ITEMS',
+          count: schedule.length,
+          detail: 'Programme timeline live',
+          icon: Calendar,
+          tab: 'schedule' as NavTab,
+        },
     {
       id: 'competitions',
       label: 'COMPETITIONS',

@@ -52,6 +52,7 @@ export function CategoryManager() {
 
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
+    if (session.role !== 'ADMIN') return;
     if (!formData.name.trim()) return;
 
     if (editingCategory) {
@@ -78,6 +79,7 @@ export function CategoryManager() {
   };
 
   const handleDeleteCategory = (cat: Category) => {
+    if (session.role !== 'ADMIN') return;
     if (
       window.confirm(
         `Are you sure you want to delete Category "${cat.name}"?`

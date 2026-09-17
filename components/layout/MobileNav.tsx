@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { NavTab, Sidebar } from './Sidebar';
 import { cn } from '@/lib/utils';
+import { useFestStore } from '@/hooks/useFestStore';
 
 interface MobileNavProps {
   currentTab: NavTab;
@@ -30,18 +31,30 @@ export function MobileNav({
   onToggleDrawer,
   onOpenAddStudent,
 }: MobileNavProps) {
-  const bottomTabs: { id: NavTab; label: string; icon: React.ElementType }[] = [
-    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-    { id: 'scoreboard', label: 'Scores', icon: Award },
-    { id: 'judging', label: 'Judging', icon: Scale },
-    { id: 'schedule', label: 'Schedule', icon: Calendar },
-  ];
+  const festStore = useFestStore();
+  const session = festStore.getSession();
+
+  // For VIEWER role, exclude judging
+  const bottomTabs: { id: NavTab; label: string; icon: React.ElementType }[] =
+    session.role === 'VIEWER'
+      ? [
+          { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+          { id: 'scoreboard', label: 'Scores', icon: Award },
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+          { id: 'competitions', label: 'Events', icon: Trophy },
+        ]
+      : [
+          { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+          { id: 'scoreboard', label: 'Scores', icon: Award },
+          { id: 'judging', label: 'Judging', icon: Scale },
+          { id: 'schedule', label: 'Schedule', icon: Calendar },
+        ];
 
   return (
     <>
-      {/* Slide-out Mobile Drawer */}
+      {/* Slide-out Navigation Drawer (Accessible across all screen sizes on Menu bar click) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex no-print">
+        <div className="fixed inset-0 z-50 flex no-print">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
@@ -49,14 +62,15 @@ export function MobileNav({
           />
 
           {/* Drawer content */}
-          <div className="relative w-72 max-w-[80vw] bg-white dark:bg-[#0A0A0A] h-full z-10 shadow-2xl flex flex-col">
+          <div className="relative w-72 sm:w-80 max-w-[85vw] bg-white dark:bg-[#0A0A0A] h-full z-10 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
             <div className="p-4 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Menu
+                Navigation Menu
               </span>
               <button
                 onClick={() => onToggleDrawer(false)}
-                className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500"
+                className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 cursor-pointer"
+                title="Close Menu"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -107,7 +121,7 @@ export function MobileNav({
           )}
         >
           <Menu className="w-5 h-5 mb-0.5" />
-          <span>All</span>
+          <span>Menu</span>
         </button>
       </nav>
     </>
