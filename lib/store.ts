@@ -42,10 +42,10 @@ const INITIAL_TEAMS: Team[] = [
     viceCaptain: '311 MUHAMMED RAZEEN MK',
     active: true,
     studentCount: 22,
-    points: 20,
-    onStagePoints: 10,
-    offStagePoints: 10,
-    goldCount: 2,
+    points: 0,
+    onStagePoints: 0,
+    offStagePoints: 0,
+    goldCount: 0,
     silverCount: 0,
     bronzeCount: 0,
     rank: 1,
@@ -60,37 +60,18 @@ const INITIAL_TEAMS: Team[] = [
     viceCaptain: '411 ZIYAD KUTHAR',
     active: true,
     studentCount: 22,
-    points: 17,
-    onStagePoints: 10,
-    offStagePoints: 7,
-    goldCount: 1,
-    silverCount: 1,
+    points: 0,
+    onStagePoints: 0,
+    offStagePoints: 0,
+    goldCount: 0,
+    silverCount: 0,
     bronzeCount: 0,
-    rank: 2,
+    rank: 1,
   },
 ];
 
 // Initial Point Adjustments
-const INITIAL_POINT_ADJUSTMENTS: PointAdjustment[] = [
-  {
-    id: 'adj-1',
-    teamId: 'team-1',
-    teamName: 'TEAM SELJUK',
-    points: 5,
-    reason: 'Exemplary Pavilion Discipline & Cleanliness',
-    createdAt: '2026-09-03T12:00:00Z',
-    createdBy: 'admin@fragancia.local',
-  },
-  {
-    id: 'adj-2',
-    teamId: 'team-2',
-    teamName: 'TEAM MAMLUK',
-    points: 5,
-    reason: 'Volunteer Marshaling & Stage Assistance',
-    createdAt: '2026-09-03T12:15:00Z',
-    createdBy: 'admin@fragancia.local',
-  },
-];
+const INITIAL_POINT_ADJUSTMENTS: PointAdjustment[] = [];
 
 // Initial Settings
 const INITIAL_SETTINGS: EventSettings = {
@@ -944,9 +925,19 @@ class FestStore {
 
   public updateRegistrationCodeLetter(id: string, codeLetter: string) {
     const clean = codeLetter.trim().toUpperCase();
+    const targetReg = this.data.registrations.find((r) => r.id === id);
     this.data.registrations = this.data.registrations.map((r) =>
       r.id === id ? { ...r, codeLetter: clean } : r
     );
+
+    if (targetReg) {
+      this.data.judgeMarks = this.data.judgeMarks.map((m) =>
+        m.competitionId === targetReg.competitionId && m.studentId === targetReg.studentId
+          ? { ...m, codeLetter: clean }
+          : m
+      );
+    }
+
     this.logAction('CODE_LETTER_UPDATED', `Assigned Code Letter ${clean} to registration`);
     apiPut('/api/registrations', { id, codeLetter: clean });
     this.persist();
@@ -1377,6 +1368,50 @@ class FestStore {
     this.recalculateAll();
     this.persist();
     this.logAction('DEMO_RESET', 'Restored pristine sample fest records');
+  }
+
+  /**
+   * Resets all scoreboard points to zero (clears results, judge marks, point adjustments, and resets competitions to Upcoming/Draft)
+   * Preserves all student profiles and event registrations with fresh 0 points.
+   */
+  public resetAllScoreboardPoints() {
+    this.data.judgeMarks = [];
+    this.data.results = [];
+    this.data.pointAdjustments = [];
+    this.data.attendance = [];
+
+    this.data.competitions = this.data.competitions.map((c) => ({
+      ...c,
+      status: 'Upcoming',
+      resultStatus: 'Draft',
+      publishedAt: null,
+    }));
+
+    this.data.teams = this.data.teams.map((t) => ({
+      ...t,
+      points: 0,
+      onStagePoints: 0,
+      offStagePoints: 0,
+      goldCount: 0,
+      silverCount: 0,
+      bronzeCount: 0,
+      rank: 1,
+    }));
+
+    this.data.students = this.data.students.map((s) => ({
+      ...s,
+      totalPoints: 0,
+      onStagePoints: 0,
+      offStagePoints: 0,
+      rank: 1,
+    }));
+
+    this.recalculateAll();
+    this.persist();
+    this.logAction(
+      'SCOREBOARD_RESET',
+      'Reset all scoreboard points, results, and marks for a pristine fresh start'
+    );
   }
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Scale,
   EyeOff,
@@ -15,6 +15,8 @@ import {
   Edit2,
   Trash2,
   RotateCcw,
+  Tag,
+  Wand2,
 } from 'lucide-react';
 import { useFestStore } from '@/hooks/useFestStore';
 import {
@@ -57,6 +59,18 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
   const activeRegIndex = compRegs.findIndex((r) => r.id === (selectedReg?.id || ''));
   const activeCodeLetter = selectedReg?.codeLetter || (activeRegIndex >= 0 ? getCodeLetterForIndex(activeRegIndex) : 'A');
 
+  // Manual code letter state
+  const [manualCodeLetter, setManualCodeLetter] = useState<string>('');
+  const [editingCodeLetterRegId, setEditingCodeLetterRegId] = useState<string | null>(null);
+  const [inlineCodeLetter, setInlineCodeLetter] = useState<string>('');
+  const [codeLetterFeedback, setCodeLetterFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedReg) {
+      setManualCodeLetter(selectedReg.codeLetter || (activeRegIndex >= 0 ? getCodeLetterForIndex(activeRegIndex) : 'A'));
+    }
+  }, [selectedReg?.id, selectedReg?.codeLetter, activeRegIndex]);
+
   // Mark scoring state
   const [typedTotal, setTypedTotal] = useState<string>('86');
   const [selectedGrade, setSelectedGrade] = useState<FestGrade>('A+');
@@ -71,6 +85,24 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
       m.studentId === activeStudentId &&
       m.judgeName === session.name
   );
+
+  const handleUpdateCodeLetter = (regId: string, newLetter: string) => {
+    const trimmed = newLetter.trim().toUpperCase();
+    if (!trimmed) return;
+    store.updateRegistrationCodeLetter(regId, trimmed);
+    setCodeLetterFeedback(`Assigned Code Letter '${trimmed}'`);
+    setTimeout(() => setCodeLetterFeedback(null), 3000);
+    setEditingCodeLetterRegId(null);
+  };
+
+  const handleAutoAssignLetters = () => {
+    if (!activeComp) return;
+    if (window.confirm(`Auto-assign sequential code letters (A, B, C...) to all ${compRegs.length} participants for ${activeComp.name}?`)) {
+      store.autoAssignCodeLetters(activeComp.id);
+      setCodeLetterFeedback(`Auto-assigned sequential letters (A-Z)`);
+      setTimeout(() => setCodeLetterFeedback(null), 3000);
+    }
+  };
 
   const handleSelectReg = (regId: string) => {
     setActiveRegId(regId);
@@ -127,12 +159,13 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
 
     const finalTotal = Math.min(100, Math.max(0, Number(typedTotal) || 0));
     const finalGrade = selectedGrade || calculateGradeFromScore(finalTotal, 100);
+    const effectiveCodeLetter = selectedReg.codeLetter || manualCodeLetter.trim().toUpperCase() || activeCodeLetter;
 
     store.saveJudgeMark({
       competitionId: activeComp.id,
       studentId: activeStudentId,
       chestNumber: activeChestNumber,
-      codeLetter: activeCodeLetter,
+      codeLetter: effectiveCodeLetter,
       grade: finalGrade,
       judgeName: session.name,
       scores: {
@@ -255,9 +288,22 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Chest Number Selector Queue (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
-          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-400">
-            PARTICIPANT QUEUE ({compRegs.length})
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-400">
+              PARTICIPANT QUEUE ({compRegs.length})
+            </h3>
+            {session.role === 'ADMIN' && compRegs.length > 0 && (
+              <button
+                type="button"
+                onClick={handleAutoAssignLetters}
+                className="flex items-center gap-1 text-[11px] font-mono text-neutral-500 hover:text-neutral-900 dark:hover:text-white px-2 py-0.5 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                title="Auto assign A, B, C... in order"
+              >
+                <Wand2 className="w-3 h-3" />
+                <span>Auto A-Z</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-none">
             {compRegs.length === 0 ? (
@@ -274,6 +320,7 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                     m.studentId === reg.studentId &&
                     m.judgeName === session.name
                 );
+                const isEditingThisLetter = editingCodeLetterRegId === reg.id;
 
                 return (
                   <div
@@ -286,7 +333,7 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black font-mono text-base ${
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black font-mono text-base shrink-0 ${
                         isSelected
                           ? 'bg-amber-400 text-neutral-950 shadow-xs'
                           : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white'
@@ -294,15 +341,67 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                         {codeLetter}
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-sm font-black font-mono tracking-wide ${
-                            isSelected
-                              ? 'text-amber-300 dark:text-amber-600'
-                              : 'text-neutral-900 dark:text-white'
-                          }`}>
-                            Code {codeLetter}
-                          </span>
-                        </div>
+                        {isEditingThisLetter ? (
+                          <div className="flex items-center gap-1 my-0.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={inlineCodeLetter}
+                              onChange={(e) => setInlineCodeLetter(e.target.value.toUpperCase())}
+                              maxLength={4}
+                              autoFocus
+                              placeholder="Code"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleUpdateCodeLetter(reg.id, inlineCodeLetter);
+                                } else if (e.key === 'Escape') {
+                                  setEditingCodeLetterRegId(null);
+                                }
+                              }}
+                              className="w-12 px-1.5 py-0.5 text-center font-mono font-black text-xs rounded bg-white text-black dark:bg-neutral-900 dark:text-white border border-black/20 dark:border-white/20 uppercase"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCodeLetter(reg.id, inlineCodeLetter)}
+                              className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold"
+                              title="Confirm code"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCodeLetterRegId(null)}
+                              className="px-1.5 py-0.5 rounded bg-neutral-400 text-white text-[10px]"
+                              title="Cancel"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-sm font-black font-mono tracking-wide ${
+                              isSelected
+                                ? 'text-amber-300 dark:text-amber-600'
+                                : 'text-neutral-900 dark:text-white'
+                            }`}>
+                              Code {codeLetter}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCodeLetterRegId(reg.id);
+                                setInlineCodeLetter(codeLetter);
+                              }}
+                              title="Change Code Letter manually"
+                              className={`p-1 rounded opacity-60 hover:opacity-100 transition-opacity ${
+                                isSelected ? 'hover:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/10'
+                              }`}
+                            >
+                              <Tag className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                         <span className="text-[11px] opacity-70 font-mono">
                           Chest {reg.chestNumber}
                         </span>
@@ -371,8 +470,8 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
             <div className="p-6 sm:p-8 rounded-[32px] bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 shadow-xs space-y-6">
               {/* Code Letter & Participant Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-black/5 dark:border-white/5">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 flex flex-col items-center justify-center font-mono shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 flex flex-col items-center justify-center font-mono shadow-sm shrink-0">
                     <span className="text-[9px] uppercase tracking-wider opacity-70">CODE</span>
                     <span className="text-2xl font-black">{activeCodeLetter}</span>
                   </div>
@@ -392,6 +491,43 @@ export function JudgePanel({ initialCompetition }: JudgePanelProps) {
                       <span className="text-xs text-neutral-400 font-mono">
                         (Judge: {session.name})
                       </span>
+                    </div>
+
+                    {/* Manual Code Letter Input Box */}
+                    <div className="flex items-center flex-wrap gap-2 mt-2">
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono font-medium">
+                        Manual Code Letter:
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={manualCodeLetter}
+                          onChange={(e) => setManualCodeLetter(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (selectedReg) handleUpdateCodeLetter(selectedReg.id, manualCodeLetter);
+                            }
+                          }}
+                          placeholder="A"
+                          maxLength={5}
+                          className="w-16 px-2 py-1 text-center font-mono font-black text-sm rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-black/15 dark:border-white/15 text-neutral-950 dark:text-white uppercase focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedReg) handleUpdateCodeLetter(selectedReg.id, manualCodeLetter);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                        >
+                          Set Code
+                        </button>
+                      </div>
+                      {codeLetterFeedback && (
+                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          ✓ {codeLetterFeedback}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
