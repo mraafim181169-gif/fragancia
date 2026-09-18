@@ -1166,8 +1166,7 @@ class FestStore {
         studentId: item.studentId,
         studentName: student?.fullName || 'Unknown',
         chestNumber: item.chestNumber,
-        codeLetter: reg?.codeLetter,
-        grade: calculateGradeFromScore(item.avgScore, 100),
+        grade: calculateGradeFromScore(item.avgScore, item.avgScore <= 10 ? 10 : 100),
         teamId: student?.teamId || '',
         teamName: student?.teamName || '',
         totalScore: item.avgScore,
@@ -1374,7 +1373,7 @@ class FestStore {
    * Resets all scoreboard points to zero (clears results, judge marks, point adjustments, and resets competitions to Upcoming/Draft)
    * Preserves all student profiles and event registrations with fresh 0 points.
    */
-  public resetAllScoreboardPoints() {
+  public async resetAllScoreboardPoints(): Promise<void> {
     this.data.judgeMarks = [];
     this.data.results = [];
     this.data.pointAdjustments = [];
@@ -1412,6 +1411,17 @@ class FestStore {
       'SCOREBOARD_RESET',
       'Reset all scoreboard points, results, and marks for a pristine fresh start'
     );
+
+    try {
+      await fetch('/api/scoreboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' }),
+      });
+      await this.refreshFromDb();
+    } catch (e) {
+      console.error('[MySQL POST /api/scoreboard] Error clearing points:', e);
+    }
   }
 }
 

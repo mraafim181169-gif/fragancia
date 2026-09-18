@@ -7,8 +7,6 @@ import {
   deleteRegistrationInDb,
   createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,23 +16,10 @@ export async function GET(req: NextRequest) {
     const competitionId = searchParams.get('competitionId') || undefined;
     const studentId = searchParams.get('studentId') || undefined;
 
-    if (isDbConfigured()) {
-      const registrations = await getRegistrationsFromDb({ competitionId, studentId });
-      return NextResponse.json({
-        success: true,
-        source: 'mysql',
-        total: registrations.length,
-        data: registrations,
-      });
-    }
-
-    let registrations = store.getRegistrations();
-    if (competitionId) registrations = registrations.filter((r) => r.competitionId === competitionId);
-    if (studentId) registrations = registrations.filter((r) => r.studentId === studentId);
-
+    const registrations = await getRegistrationsFromDb({ competitionId, studentId });
     return NextResponse.json({
       success: true,
-      source: 'fallback',
+      source: 'mysql',
       total: registrations.length,
       data: registrations,
     });
@@ -47,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { competitionId, studentId, codeLetter, status, bypassPortal } = body;
+    const { competitionId, studentId, codeLetter, status } = body;
 
     if (!competitionId || !studentId) {
       return NextResponse.json(
@@ -72,18 +57,13 @@ export async function POST(req: NextRequest) {
       registeredAt: new Date().toISOString(),
     };
 
-    if (isDbConfigured()) {
-      await createRegistrationInDb(regRecord as any);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'STUDENT_REGISTERED',
-        details: `Registered participant for competition ${competitionId} (Code: ${regRecord.codeLetter}) in MySQL`,
-      });
-      return NextResponse.json({ success: true, id: regId, data: regRecord }, { status: 201 });
-    }
-
-    const result = store.registerStudent(competitionId, studentId, bypassPortal, codeLetter);
-    return NextResponse.json(result, { status: result.success ? 201 : 400 });
+    await createRegistrationInDb(regRecord as any);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'STUDENT_REGISTERED',
+      details: `Registered participant for competition ${competitionId} (Code: ${regRecord.codeLetter}) in MySQL`,
+    });
+    return NextResponse.json({ success: true, id: regId, data: regRecord }, { status: 201 });
   } catch (error: any) {
     console.error('[API /api/registrations POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -99,23 +79,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Registration ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      if (codeLetter !== undefined) {
-        await updateRegistrationCodeLetterInDb(id, codeLetter);
-      }
-      if (status !== undefined) {
-        await updateRegistrationStatusInDb(id, status);
-      }
-      return NextResponse.json({ success: true, message: 'Registration updated in MySQL' });
-    }
-
     if (codeLetter !== undefined) {
-      store.updateRegistrationCodeLetter(id, codeLetter);
+      await updateRegistrationCodeLetterInDb(id, codeLetter);
     }
     if (status !== undefined) {
-      store.updateRegistrationStatus(id, status);
+      await updateRegistrationStatusInDb(id, status);
     }
-    return NextResponse.json({ success: true, message: 'Registration updated' });
+    return NextResponse.json({ success: true, message: 'Registration updated in MySQL' });
   } catch (error: any) {
     console.error('[API /api/registrations PUT Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -131,13 +101,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Registration ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await deleteRegistrationInDb(id);
-      return NextResponse.json({ success: true, message: 'Registration removed from MySQL' });
-    }
-
-    store.deleteRegistration(id);
-    return NextResponse.json({ success: true, message: 'Registration deleted' });
+    await deleteRegistrationInDb(id);
+    return NextResponse.json({ success: true, message: 'Registration removed from MySQL' });
   } catch (error: any) {
     console.error('[API /api/registrations DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

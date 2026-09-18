@@ -6,27 +6,15 @@ import {
   deleteCompetitionInDb,
   createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    if (isDbConfigured()) {
-      const competitions = await getCompetitionsFromDb();
-      return NextResponse.json({
-        success: true,
-        source: 'mysql',
-        total: competitions.length,
-        data: competitions,
-      });
-    }
-
-    const competitions = store.getCompetitions();
+    const competitions = await getCompetitionsFromDb();
     return NextResponse.json({
       success: true,
-      source: 'fallback',
+      source: 'mysql',
       total: competitions.length,
       data: competitions,
     });
@@ -74,18 +62,13 @@ export async function POST(req: NextRequest) {
       publishedAt: body.publishedAt || null,
     };
 
-    if (isDbConfigured()) {
-      await createCompetitionInDb(compData as any);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'COMPETITION_CREATED',
-        details: `Created competition ${name} in MySQL`,
-      });
-      return NextResponse.json({ success: true, id: compId, data: compData }, { status: 201 });
-    }
-
-    const created = store.createCompetition(compData as any);
-    return NextResponse.json({ success: true, data: created }, { status: 201 });
+    await createCompetitionInDb(compData as any);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'COMPETITION_CREATED',
+      details: `Created competition ${name} in MySQL`,
+    });
+    return NextResponse.json({ success: true, id: compId, data: compData }, { status: 201 });
   } catch (error: any) {
     console.error('[API /api/competitions POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -101,13 +84,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Competition ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await updateCompetitionInDb(id, updates);
-      return NextResponse.json({ success: true, message: 'Competition updated in MySQL' });
-    }
-
-    store.updateCompetition(id, updates);
-    return NextResponse.json({ success: true, message: 'Competition updated' });
+    await updateCompetitionInDb(id, updates);
+    return NextResponse.json({ success: true, message: 'Competition updated in MySQL' });
   } catch (error: any) {
     console.error('[API /api/competitions PUT Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -123,18 +101,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Competition ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await deleteCompetitionInDb(id);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'COMPETITION_DELETED',
-        details: `Deleted competition ${id} from MySQL`,
-      });
-      return NextResponse.json({ success: true, message: 'Competition deleted from MySQL' });
-    }
-
-    store.deleteCompetition(id);
-    return NextResponse.json({ success: true, message: 'Competition deleted' });
+    await deleteCompetitionInDb(id);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'COMPETITION_DELETED',
+      details: `Deleted competition ${id} from MySQL`,
+    });
+    return NextResponse.json({ success: true, message: 'Competition deleted from MySQL' });
   } catch (error: any) {
     console.error('[API /api/competitions DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

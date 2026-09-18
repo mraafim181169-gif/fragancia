@@ -5,20 +5,13 @@ import {
   unpublishCompetitionResultInDb,
   createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    if (isDbConfigured()) {
-      const results = await getCompetitionResultsFromDb();
-      return NextResponse.json({ success: true, source: 'mysql', total: results.length, data: results });
-    }
-
-    const results = store.getResults();
-    return NextResponse.json({ success: true, source: 'fallback', total: results.length, data: results });
+    const results = await getCompetitionResultsFromDb();
+    return NextResponse.json({ success: true, source: 'mysql', total: results.length, data: results });
   } catch (error: any) {
     console.error('[API /api/results GET Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -44,18 +37,13 @@ export async function POST(req: NextRequest) {
       publishedAt: status === 'Published' ? new Date().toISOString() : null,
     };
 
-    if (isDbConfigured()) {
-      await saveCompetitionResultInDb(resRecord);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'RESULT_PUBLISHED',
-        details: `Published results for competition ${competitionId} in MySQL`,
-      });
-      return NextResponse.json({ success: true, id: resId, data: resRecord }, { status: 201 });
-    }
-
-    const published = store.publishCompetitionResult(competitionId, rankings);
-    return NextResponse.json({ success: true, data: published }, { status: 201 });
+    await saveCompetitionResultInDb(resRecord);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'RESULT_PUBLISHED',
+      details: `Published results for competition ${competitionId} in MySQL`,
+    });
+    return NextResponse.json({ success: true, id: resId, data: resRecord }, { status: 201 });
   } catch (error: any) {
     console.error('[API /api/results POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -71,18 +59,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'competitionId is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await unpublishCompetitionResultInDb(competitionId);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'RESULT_UNPUBLISHED',
-        details: `Withdrew published result for competition ${competitionId} in MySQL`,
-      });
-      return NextResponse.json({ success: true, message: 'Result unpublished in MySQL' });
-    }
-
-    store.unpublishResult(competitionId);
-    return NextResponse.json({ success: true, message: 'Result unpublished' });
+    await unpublishCompetitionResultInDb(competitionId);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'RESULT_UNPUBLISHED',
+      details: `Withdrew published result for competition ${competitionId} in MySQL`,
+    });
+    return NextResponse.json({ success: true, message: 'Result unpublished in MySQL' });
   } catch (error: any) {
     console.error('[API /api/results DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

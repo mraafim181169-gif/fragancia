@@ -1,4 +1,5 @@
 import mysql, { Pool, PoolOptions, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { execSync } from 'child_process';
 
 /**
  * Reusable Server-Side MySQL Connection Pool for Fragancia Fest
@@ -16,32 +17,31 @@ import mysql, { Pool, PoolOptions, RowDataPacket, ResultSetHeader } from 'mysql2
 
 interface GlobalWithDb {
   mysqlPool?: Pool;
+  daemonChecked?: boolean;
 }
 
 const globalForDb = globalThis as unknown as GlobalWithDb;
 
-/**
- * Checks whether MySQL configuration is present and valid for this environment.
- * If running in a cloud container (like Cloud Run preview) and DB_HOST is 'localhost'
- * or '127.0.0.1', returns false because no local MySQL daemon exists in this container.
- * When deployed to Hostinger (where K_SERVICE is not set), localhost connects directly
- * to Hostinger's local MySQL server.
- */
-export function isDbConfigured(): boolean {
-  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
-    return false;
-  }
+function ensureLocalMysqlRunning(): void {
+  if (globalForDb.daemonChecked) return;
+  globalForDb.daemonChecked = true;
 
-  // Detect Cloud Run container preview environment where localhost has no MySQL daemon
-  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.CLOUD_RUN_TIMEOUT_SECONDS);
   const host = (process.env.DB_HOST || '').trim().toLowerCase();
   const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  if (!isLocalHost) return;
 
-  if (isCloudRun && isLocalHost) {
-    return false;
+  try {
+    execSync('mariadb-admin ping 2>/dev/null || (mkdir -p /var/run/mysqld && chown -R mysql:mysql /var/run/mysqld /var/lib/mysql 2>/dev/null && mariadbd-safe --user=mysql & sleep 2)', { stdio: 'ignore', timeout: 5000 });
+  } catch {
+    // Ignore errors if running in restricted environments
   }
+}
 
-  return true;
+/**
+ * Checks whether MySQL configuration is present.
+ */
+export function isDbConfigured(): boolean {
+  return Boolean(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
 }
 
 export function getPoolConfig(): PoolOptions {
@@ -66,6 +66,8 @@ export function getDbPool(): Pool | null {
   if (!isDbConfigured()) {
     return null;
   }
+
+  ensureLocalMysqlRunning();
 
   if (!globalForDb.mysqlPool) {
     try {
@@ -216,17 +218,6 @@ export async function checkDbConnection(): Promise<{
     };
   }
 
-  if (isCloudRun && (process.env.DB_HOST === 'localhost' || process.env.DB_HOST === '127.0.0.1')) {
-    return {
-      configured: true,
-      connected: false,
-      isCloudRunPreview: true,
-      error: "DB_HOST is set to 'localhost' for Hostinger deployment. No local MySQL daemon runs inside the Cloud Run preview container. The app operates seamlessly with high-fidelity in-memory state. On Hostinger, localhost connects directly to Hostinger MySQL.",
-      host: process.env.DB_HOST,
-      database: process.env.DB_NAME,
-    };
-  }
-
   try {
     const pool = getDbPool();
     if (!pool) {
@@ -240,7 +231,7 @@ export async function checkDbConnection(): Promise<{
       };
     }
     const [result] = await Promise.race([
-      pool.query<RowDataPacket[]>('SELECT 1 as test, NOW() as current_time'),
+      pool.query<RowDataPacket[]>('SELECT 1 as test, NOW() as cur_time'),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Connection timed out')), 2000)),
     ]);
     return {

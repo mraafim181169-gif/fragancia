@@ -117,6 +117,7 @@ export interface Competition {
   status: CompetitionStatus;
   stage: string;
   startTime: string;
+  endTime?: string;
   scheduledTime?: string;
   durationMinutes?: number;
   scoringCriteria: ScoringCriterion[];

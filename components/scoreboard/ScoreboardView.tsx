@@ -1226,8 +1226,8 @@ export function ScoreboardView() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  store.resetAllScoreboardPoints();
+                onClick={async () => {
+                  await store.resetAllScoreboardPoints();
                   setShowResetConfirm(false);
                   setResetSuccessToast(true);
                   setTimeout(() => setResetSuccessToast(false), 4000);

@@ -279,6 +279,7 @@ export async function getCompetitionsFromDb(): Promise<Competition[]> {
       status: r.status,
       stage: r.stage || '',
       startTime: r.start_time || '10:00 AM',
+      endTime: r.end_time || undefined,
       scheduledTime: r.scheduled_time || r.start_time || '10:00 AM',
       durationMinutes: Number(r.duration_minutes || 10),
       scoringCriteria: scoringCriteria || [],
@@ -293,8 +294,8 @@ export async function createCompetitionInDb(comp: Competition): Promise<void> {
     INSERT INTO competitions (
       id, name, type, category_id, stage_type, max_participants, time_limit, rules,
       first_place_points, second_place_points, third_place_points, status, stage,
-      start_time, scheduled_time, duration_minutes, scoring_criteria, result_status, published_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      start_time, end_time, scheduled_time, duration_minutes, scoring_criteria, result_status, published_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   await execute(sql, [
@@ -312,6 +313,7 @@ export async function createCompetitionInDb(comp: Competition): Promise<void> {
     comp.status || 'Upcoming',
     comp.stage || '',
     comp.startTime || '10:00 AM',
+    comp.endTime || null,
     comp.scheduledTime || comp.startTime || '10:00 AM',
     comp.durationMinutes || 10,
     comp.scoringCriteria ? JSON.stringify(comp.scoringCriteria) : null,
@@ -338,6 +340,7 @@ export async function updateCompetitionInDb(id: string, updates: Partial<Competi
     status: 'status',
     stage: 'stage',
     startTime: 'start_time',
+    endTime: 'end_time',
     scheduledTime: 'scheduled_time',
     durationMinutes: 'duration_minutes',
     resultStatus: 'result_status',
@@ -705,6 +708,7 @@ export async function saveCompetitionResultInDb(res: CompetitionResult): Promise
       [res.competitionId]
     );
   }
+  await syncCalculatedPointsToDb();
 }
 
 export async function unpublishCompetitionResultInDb(competitionId: string): Promise<void> {
@@ -716,6 +720,7 @@ export async function unpublishCompetitionResultInDb(competitionId: string): Pro
     'UPDATE competitions SET result_status = "Draft" WHERE id = ?',
     [competitionId]
   );
+  await syncCalculatedPointsToDb();
 }
 
 // ==========================================
@@ -959,6 +964,26 @@ export async function getScoreboardDataFromDb() {
   };
 }
 
+export async function syncCalculatedPointsToDb(): Promise<void> {
+  try {
+    const scoreboard = await getScoreboardDataFromDb();
+    for (const team of scoreboard.teams) {
+      await execute(
+        'UPDATE teams SET points = ?, on_stage_points = ?, off_stage_points = ?, gold_count = ?, silver_count = ?, bronze_count = ? WHERE id = ?',
+        [team.points, team.onStagePoints, team.offStagePoints, team.goldCount, team.silverCount, team.bronzeCount, team.id]
+      );
+    }
+    for (const student of scoreboard.students) {
+      await execute(
+        'UPDATE students SET total_points = ?, on_stage_points = ?, off_stage_points = ? WHERE id = ?',
+        [student.totalPoints, student.onStagePoints, student.offStagePoints, student.id]
+      );
+    }
+  } catch (err) {
+    console.error('[syncCalculatedPointsToDb] Error updating points in MySQL:', err);
+  }
+}
+
 // ==========================================
 // 15. FULL DATA SYNC FOR CLIENT STORE
 // ==========================================
@@ -1005,4 +1030,21 @@ export async function getFullFestDataFromDb() {
     schedule,
     auditLogs,
   };
+}
+
+// ==========================================
+// 16. SCOREBOARD RESET (FRESH START)
+// ==========================================
+export async function resetScoreboardPointsInDb(): Promise<void> {
+  await execute('DELETE FROM marks');
+  await execute('DELETE FROM competition_results');
+  await execute('DELETE FROM point_adjustments');
+  await execute('UPDATE competitions SET status = "Upcoming", result_status = "Draft", published_at = NULL');
+  await execute('UPDATE teams SET points = 0, on_stage_points = 0, off_stage_points = 0, gold_count = 0, silver_count = 0, bronze_count = 0');
+  await execute('UPDATE students SET total_points = 0, on_stage_points = 0, off_stage_points = 0');
+  await createAuditLogInDb({
+    id: `log-${Date.now()}`,
+    action: 'SCOREBOARD_RESET',
+    details: 'Reset all scores, judge marks, results, and point adjustments in MySQL to 0 (fresh start)',
+  });
 }

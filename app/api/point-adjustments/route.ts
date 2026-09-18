@@ -5,20 +5,13 @@ import {
   deletePointAdjustmentInDb,
   createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    if (isDbConfigured()) {
-      const adjustments = await getPointAdjustmentsFromDb();
-      return NextResponse.json({ success: true, source: 'mysql', total: adjustments.length, data: adjustments });
-    }
-
-    const adjustments = store.getPointAdjustments();
-    return NextResponse.json({ success: true, source: 'fallback', total: adjustments.length, data: adjustments });
+    const adjustments = await getPointAdjustmentsFromDb();
+    return NextResponse.json({ success: true, source: 'mysql', total: adjustments.length, data: adjustments });
   } catch (error: any) {
     console.error('[API /api/point-adjustments GET Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -48,19 +41,14 @@ export async function POST(req: NextRequest) {
       createdBy: createdBy || 'admin@fragancia.local',
     };
 
-    if (isDbConfigured()) {
-      await createPointAdjustmentInDb(adjRecord);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'POINT_ADJUSTMENT',
-        details: `Applied ${points > 0 ? `+${points}` : points} points to team ${teamId}: "${reason}" in MySQL`,
-        user: createdBy,
-      });
-      return NextResponse.json({ success: true, id, data: adjRecord }, { status: 201 });
-    }
-
-    const created = store.addPointAdjustment(teamId, points, reason);
-    return NextResponse.json({ success: true, data: created }, { status: 201 });
+    await createPointAdjustmentInDb(adjRecord);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'POINT_ADJUSTMENT',
+      details: `Applied ${points > 0 ? `+${points}` : points} points to team ${teamId}: "${reason}" in MySQL`,
+      user: createdBy,
+    });
+    return NextResponse.json({ success: true, id, data: adjRecord }, { status: 201 });
   } catch (error: any) {
     console.error('[API /api/point-adjustments POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -76,13 +64,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Adjustment ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await deletePointAdjustmentInDb(id);
-      return NextResponse.json({ success: true, message: 'Point adjustment deleted from MySQL' });
-    }
-
-    store.deletePointAdjustment(id);
-    return NextResponse.json({ success: true, message: 'Point adjustment deleted' });
+    await deletePointAdjustmentInDb(id);
+    return NextResponse.json({ success: true, message: 'Point adjustment deleted from MySQL' });
   } catch (error: any) {
     console.error('[API /api/point-adjustments DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

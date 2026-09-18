@@ -5,8 +5,6 @@ import {
   deleteJudgeMarkInDb,
   createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 import { calculateGradeFromScore } from '@/types/fest';
 
 export const dynamic = 'force-dynamic';
@@ -16,23 +14,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const competitionId = searchParams.get('competitionId') || undefined;
 
-    if (isDbConfigured()) {
-      const marks = await getMarksFromDb(competitionId);
-      return NextResponse.json({
-        success: true,
-        source: 'mysql',
-        total: marks.length,
-        data: marks,
-      });
-    }
-
-    const marks = competitionId
-      ? store.getMarksForCompetition(competitionId)
-      : store.getJudgeMarks();
-
+    const marks = await getMarksFromDb(competitionId);
     return NextResponse.json({
       success: true,
-      source: 'fallback',
+      source: 'mysql',
       total: marks.length,
       data: marks,
     });
@@ -72,18 +57,13 @@ export async function POST(req: NextRequest) {
       submittedAt: new Date().toISOString(),
     };
 
-    if (isDbConfigured()) {
-      await saveJudgeMarkInDb(markRecord);
-      await createAuditLogInDb({
-        id: `log-${Date.now()}`,
-        action: 'MARK_SAVED',
-        details: `Saved judge mark (${totalScore} pts, Grade ${computedGrade}) in MySQL for student ${studentId}`,
-      });
-      return NextResponse.json({ success: true, id: markId, data: markRecord }, { status: 201 });
-    }
-
-    const saved = store.saveJudgeMark(markRecord);
-    return NextResponse.json({ success: true, data: saved }, { status: 201 });
+    await saveJudgeMarkInDb(markRecord);
+    await createAuditLogInDb({
+      id: `log-${Date.now()}`,
+      action: 'MARK_SAVED',
+      details: `Saved judge mark (${totalScore} pts, Grade ${computedGrade}) in MySQL for student ${studentId}`,
+    });
+    return NextResponse.json({ success: true, id: markId, data: markRecord }, { status: 201 });
   } catch (error: any) {
     console.error('[API /api/marks POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -99,13 +79,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Mark ID is required' }, { status: 400 });
     }
 
-    if (isDbConfigured()) {
-      await deleteJudgeMarkInDb(id);
-      return NextResponse.json({ success: true, message: 'Judge mark deleted from MySQL' });
-    }
-
-    store.deleteJudgeMark(id);
-    return NextResponse.json({ success: true, message: 'Judge mark deleted' });
+    await deleteJudgeMarkInDb(id);
+    return NextResponse.json({ success: true, message: 'Judge mark deleted from MySQL' });
   } catch (error: any) {
     console.error('[API /api/marks DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

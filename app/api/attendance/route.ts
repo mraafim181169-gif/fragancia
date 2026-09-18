@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getAttendanceFromDb,
   markAttendanceInDb,
-  createAuditLogInDb,
 } from '@/lib/dbQueries';
-import { isDbConfigured } from '@/lib/db';
-import { store } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,23 +11,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const competitionId = searchParams.get('competitionId') || undefined;
 
-    if (isDbConfigured()) {
-      const attendance = await getAttendanceFromDb(competitionId);
-      return NextResponse.json({
-        success: true,
-        source: 'mysql',
-        total: attendance.length,
-        data: attendance,
-      });
-    }
-
-    const attendance = competitionId
-      ? store.getCompetitionAttendance(competitionId)
-      : store.getAttendance();
-
+    const attendance = await getAttendanceFromDb(competitionId);
     return NextResponse.json({
       success: true,
-      source: 'fallback',
+      source: 'mysql',
       total: attendance.length,
       data: attendance,
     });
@@ -54,23 +38,18 @@ export async function POST(req: NextRequest) {
 
     const id = body.id || `att-${Date.now()}-${studentId}`;
 
-    if (isDbConfigured()) {
-      await markAttendanceInDb({
-        id,
-        competitionId,
-        studentId,
-        status: status as 'Present' | 'Absent',
-      });
+    await markAttendanceInDb({
+      id,
+      competitionId,
+      studentId,
+      status: status as 'Present' | 'Absent',
+    });
 
-      return NextResponse.json({
-        success: true,
-        message: `Attendance marked as ${status} in MySQL`,
-        record: { id, competitionId, studentId, chestNumber, status },
-      });
-    }
-
-    store.markAttendance(competitionId, studentId, chestNumber || '', status as 'Present' | 'Absent');
-    return NextResponse.json({ success: true, message: `Attendance marked as ${status}` });
+    return NextResponse.json({
+      success: true,
+      message: `Attendance marked as ${status} in MySQL`,
+      record: { id, competitionId, studentId, chestNumber, status },
+    });
   } catch (error: any) {
     console.error('[API /api/attendance POST Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
